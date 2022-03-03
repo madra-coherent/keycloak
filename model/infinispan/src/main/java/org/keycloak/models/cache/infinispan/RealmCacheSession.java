@@ -894,8 +894,6 @@ public class RealmCacheSession implements CacheRealmProvider {
         // caller provided a wrong set of ids, maybe because relying on stale data
         // Need a way to signal that upstream? How? Using a nullable Optional?
         
-        // TODO: cope with ordering or results - database named query does lookup with sort by name ascending...
-            
         return Stream.of(
                 cachedRoleLookup.values().stream().filter(Optional::isPresent).map(Optional::get), // keep only the cache hits
                 rolesFromDelegate

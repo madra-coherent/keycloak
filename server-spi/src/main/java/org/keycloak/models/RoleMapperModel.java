@@ -111,12 +111,16 @@ public interface RoleMapperModel {
         Set<RoleModel> value = this.getRoleMappings();
         return value != null ? value.stream() : Stream.empty();
     }
-    
+
     /**
-     * Returns stream of all roles including composites that are directly set to this object.
-     * @return Stream of {@link RoleModel}. Never returns {@code null}.
+     * Returns stream of all role IDs (both realm all client) that are directly set to this object.
+     * NOTE: the default implementation is sub-optimal, as it relies on {@link #getRoleMappingsStream()}.
+     * It's highly recommended to specialize the implementation for each case. 
+     * @return Stream of role IDs. Never returns {@code null}.
      */
-    Stream<RoleModel> getDeepRoleMappingsStream();
+    default Stream<String> getRoleMappingIdsStream() {
+        return this.getRoleMappingsStream().map(RoleModel::getId);
+    }
 
     /**
      * Removes the given role mapping from this object.

@@ -248,6 +248,23 @@ public class RoleUtils {
         if (group.getParentId() == null) return;
         addGroupRoles(group.getParent(), roleMappings);
     }
+    
+    /**
+     * Collects all the roles attached to the specified groups and their ascendants
+     * @param groups the groups to collect role IDs for 
+     * @return the collected set of role IDs
+     */
+    public static Set<String> collectGroupRoleMappingIds(Stream<GroupModel> groups) {
+        Set<String> roleIds = new HashSet<>();
+        groups.forEach(group -> collectGroupRoleIds(group, roleIds));
+        return roleIds;
+    }
+    
+    private static void collectGroupRoleIds(GroupModel group, Set<String> roleIds) {
+        roleIds.addAll(group.getRoleMappingIdsStream().collect(Collectors.toList()));
+        if (group.getParentId() == null) return;
+        collectGroupRoleIds(group.getParent(), roleIds);
+    }
 
     public static boolean isRealmRole(RoleModel r) {
         return r.getContainer() instanceof RealmModel;

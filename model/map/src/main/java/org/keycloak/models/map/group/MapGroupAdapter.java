@@ -166,21 +166,14 @@ public class MapGroupAdapter extends AbstractGroupModel<MapGroupEntity> {
     }
 
     @Override
-    public Stream<RoleModel> getRoleMappingsStream() {
+    public Stream<String> getRoleMappingIdsStream() {
         Set<String> grantedRoles = entity.getGrantedRoles();
-        return session.roles().getRolesByIds(realm, grantedRoles == null ? Stream.empty() : grantedRoles.stream());
+        return grantedRoles == null ? Stream.empty() : grantedRoles.stream();
     }
 
     @Override
-    public Stream<RoleModel> getDeepRoleMappingsStream() {
-        Set<String> roleIds = new HashSet<>();
-        GroupModel group = this;
-        while (group != null) {
-            roleIds.addAll(group.getRoleMappingsStream().map(RoleModel::getId).collect(Collectors.toList()));
-            group = group.getParent();
-        }
-        
-        return session.roles().getRolesByIds(realm, session.roles().getDeepRoleIdsStream(realm, roleIds.stream()));
+    public Stream<RoleModel> getRoleMappingsStream() {
+        return session.roles().getRolesByIds(realm, getRoleMappingIdsStream());
     }
 
     @Override

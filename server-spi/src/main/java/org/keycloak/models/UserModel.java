@@ -218,6 +218,13 @@ public interface UserModel extends RoleMapperModel {
     void setEmailVerified(boolean verified);
 
     /**
+     * Returns stream of all roles including composites that are directly set to this object.
+     * @return Stream of {@link RoleModel}. Never returns {@code null}.
+     */
+    Stream<RoleModel> getDeepRoleMappingsStream();
+
+
+    /**
      * @deprecated Use {@link #getGroupsStream() getGroupsStream} instead.
      */
     @Deprecated

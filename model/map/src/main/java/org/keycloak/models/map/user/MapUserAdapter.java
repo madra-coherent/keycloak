@@ -317,10 +317,14 @@ public abstract class MapUserAdapter extends AbstractUserModel<MapUserEntity> {
     }
 
     @Override
-    public Stream<RoleModel> getRoleMappingsStream() {
+    public Stream<String> getRoleMappingIdsStream() {
         Set<String> roles = entity.getRolesMembership();
-        if (roles == null || roles.isEmpty()) return Stream.empty();
-        return entity.getRolesMembership().stream().map(realm::getRoleById);
+        return roles == null ? Stream.empty() : roles.stream();
+    }
+
+    @Override
+    public Stream<RoleModel> getRoleMappingsStream() {
+        return getRoleMappingIdsStream().map(realm::getRoleById);
     }
 
     @Override

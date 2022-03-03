@@ -44,9 +44,10 @@ public interface RoleLookupProvider {
 
     /**
      * Exact search for multiple roles by their internal ID.
+     * Important: no ordering is specified, so sorting must performed onto the result if appropriate 
      * @param realm Realm.
      * @param ids the Internal IDs of the roles.
-     * @return Model of the role.
+     * @return Stream of {@link RoleModel}.
      */
     Stream<RoleModel> getRolesByIds(RealmModel realm, Stream<String> ids);
 

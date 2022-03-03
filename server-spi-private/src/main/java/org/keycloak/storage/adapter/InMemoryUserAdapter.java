@@ -277,13 +277,27 @@ public class InMemoryUserAdapter extends UserModelDefaultMethods.Streams {
     }
 
     @Override
+    public Set<RoleModel> getClientRoleMappings(ClientModel app) {
+        // TODO Auto-generated method stub
+        return null;
+    }
+
+    @Override
+    public Stream<String> getRoleMappingIdsStream() {
+        return roleIds.stream();
+    }
+
+    @Override
     public Stream<RoleModel> getRoleMappingsStream() {
         return roleIds.stream().map(realm::getRoleById);
     }
 
     @Override
     public Stream<RoleModel> getDeepRoleMappingsStream() {
-        return realm.getRolesByIds(session.roles().getDeepRoleIdsStream(realm, roleIds.stream()));
+        Set<String> collectedRoleIds = new HashSet<>(roleIds);
+        collectedRoleIds.addAll(roleIds);
+        collectedRoleIds.addAll(RoleUtils.collectGroupRoleMappingIds(getGroupsStream()));
+        return realm.getRolesByIds(session.roles().getDeepRoleIdsStream(realm, collectedRoleIds.stream()));
     }
 
     @Override

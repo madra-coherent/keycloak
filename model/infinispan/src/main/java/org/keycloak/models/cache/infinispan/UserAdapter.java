@@ -33,9 +33,9 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -330,22 +330,36 @@ public class UserAdapter implements CachedUserModel.Streams {
     }
     
     @Override
+    public Stream<String> getRoleMappingIdsStream() {
+        if (updated != null) return updated.getRoleMappingIdsStream();
+        return cached.getRoleMappings(modelSupplier).stream();
+    }
+
+    @Override
     public Stream<RoleModel> getDeepRoleMappingsStream() {
         if (updated != null) return updated.getDeepRoleMappingsStream();
 
-        Set<String> roleIds = new HashSet<>(cached.getRoleMappings(modelSupplier));
-        // TODO: deal with roles attached to group hierarchy as well
-        //cached.getGroups(modelSupplier).forEach(group -> addGroupRoles(group, roleIds));
+        Set<String> roleIds = new HashSet<>();
+        roleIds.addAll(cached.getRoleMappings(modelSupplier));
+        
+        // Collects all the roles attached to the groups (and their ascendant) this user belongs to
+        Set<String> groupIds = cached.getGroups(modelSupplier);
+        List<GroupModel> groups = groupIds.stream()
+                .map(groupId -> keycloakSession.groups().getGroupById(realm, groupId))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        if (groups.size() != groupIds.size()) {
+            // One or more groups could not be found - hints that a concurrent operation
+            // happened. Invalidate this user and fallback to (persistent) delegate
+            getDelegateForUpdate();
+            return updated.getDeepRoleMappingsStream();
+        }
+        
+        roleIds.addAll(RoleUtils.collectGroupRoleMappingIds(groups.stream()));
         
         Stream<String> expandedRoleIds = keycloakSession.roles().getDeepRoleIdsStream(realm, roleIds.stream());
         return keycloakSession.roles().getRolesByIds(realm, expandedRoleIds);
     }
-
-//    private static void addGroupRoles(GroupModel group, Set<String> roleIds) {
-//        roleIds.addAll(group.getRoleMappings().collect(Collectors.toSet()));
-//        if (group.getParentId() == null) return;
-//        addGroupRoles(group.getParent(), roleMappings);
-//    }
 
     @Override
     public void deleteRoleMapping(RoleModel role) {

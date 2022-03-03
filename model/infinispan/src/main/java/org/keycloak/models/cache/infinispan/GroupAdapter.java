@@ -182,6 +182,12 @@ public class GroupAdapter implements GroupModel.Streams {
     }
 
     @Override
+    public Stream<String> getRoleMappingIdsStream() {
+        if (updated != null) return updated.getRoleMappingIdsStream();
+        return cached.getRoleMappings(modelSupplier).stream();
+    }
+
+    @Override
     public Stream<RoleModel> getRoleMappingsStream() {
         if (isUpdated()) return updated.getRoleMappingsStream();
         Set<RoleModel> roles = new HashSet<>();
@@ -198,12 +204,6 @@ public class GroupAdapter implements GroupModel.Streams {
         return roles.stream();
     }
     
-    @Override
-    public Stream<RoleModel> getDeepRoleMappingsStream() {
-        if (isUpdated()) return updated.getRoleMappingsStream();
-        return null;
-    }
-
     @Override
     public void deleteRoleMapping(RoleModel role) {
         getDelegateForUpdate();

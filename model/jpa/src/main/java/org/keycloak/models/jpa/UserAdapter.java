@@ -473,28 +473,25 @@ public class UserAdapter implements UserModel.Streams, JpaModel<UserEntity> {
         return getRoleMappingsStream().filter(RoleUtils::isRealmRole);
     }
 
+    @Override
+    public Stream<String> getRoleMappingIdsStream() {
+        TypedQuery<String> query = em.createNamedQuery("userRoleMappingIds", String.class);
+        query.setParameter("user", getEntity());
+        return closing(query.getResultStream());
+    }
 
     @Override
     public Stream<RoleModel> getRoleMappingsStream() {
         // we query ids only as the role might be cached and following the @ManyToOne will result in a load
         // even if we're getting just the id.
-        TypedQuery<String> query = em.createNamedQuery("userRoleMappingIds", String.class);
-        query.setParameter("user", getEntity());
-        return closing(realm.getRolesByIds(query.getResultStream()));
+        return closing(realm.getRolesByIds(getRoleMappingIdsStream()));
     }
 
-    
     @Override
     public Stream<RoleModel> getDeepRoleMappingsStream() {
         Set<String> roleIds = new HashSet<>();
-
-        TypedQuery<String> query = em.createNamedQuery("userRoleMappingIds", String.class);
-        query.setParameter("user", getEntity());
-        roleIds.addAll(closing(query.getResultStream()).collect(Collectors.toList()));
-        
-        // TODO: deal with roles attached to group hierarchy as well
-        //cached.getGroups(modelSupplier).forEach(group -> addGroupRoles(group, roleIds));
-        
+        roleIds.addAll(getRoleMappingIdsStream().collect(Collectors.toList()));
+        roleIds.addAll(RoleUtils.collectGroupRoleMappingIds(getGroupsStream()));
         Stream<String> expandedRoleIds = session.roles().getDeepRoleIdsStream(realm, roleIds.stream());
         return realm.getRolesByIds(expandedRoleIds);
     }

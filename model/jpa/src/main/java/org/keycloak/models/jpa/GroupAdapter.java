@@ -20,6 +20,7 @@ package org.keycloak.models.jpa;
 import org.keycloak.common.util.MultivaluedHashMap;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.GroupModel;
+import org.keycloak.models.GroupModel.Streams;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.RoleModel;
 import org.keycloak.models.jpa.entities.GroupAttributeEntity;
@@ -242,31 +243,20 @@ public class GroupAdapter implements GroupModel.Streams , JpaModel<GroupEntity> 
         return getRoleMappingsStream().filter(RoleUtils::isRealmRole);
     }
 
+    @Override
+    public Stream<String> getRoleMappingIdsStream() {
+        TypedQuery<String> query = em.createNamedQuery("groupRoleMappingIds", String.class);
+        query.setParameter("group", getEntity());
+        return closing(query.getResultStream());
+    }
 
     @Override
     public Stream<RoleModel> getRoleMappingsStream() {
         // we query ids only as the role might be cached and following the @ManyToOne will result in a load
         // even if we're getting just the id.
-        TypedQuery<String> query = em.createNamedQuery("groupRoleMappingIds", String.class);
-        query.setParameter("group", getEntity());
-        return realm.getRolesByIds(closing(query.getResultStream()));
+        return realm.getRolesByIds(getRoleMappingIdsStream());
     }
     
-    @Override
-    public Stream<RoleModel> getDeepRoleMappingsStream() {
-        Set<String> groupIds = new HashSet<>();
-        GroupModel group = this;
-        while (group != null) {
-            groupIds.add(group.getId());
-            group = group.getParent();
-        }
-        
-        TypedQuery<String> query = em.createNamedQuery("groupListRoleMappingIds", String.class);
-        query.setParameter("groupids", groupIds);
-        // TODO: incorrect! This must expand the roles to include the children roles
-        return realm.getRolesByIds(closing(query.getResultStream()));
-    }
-
     @Override
     public void deleteRoleMapping(RoleModel role) {
         if (group == null || role == null) return;
