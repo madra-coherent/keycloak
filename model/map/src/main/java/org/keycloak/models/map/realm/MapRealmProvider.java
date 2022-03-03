@@ -470,6 +470,17 @@ public class MapRealmProvider implements RealmProvider {
     public RoleModel getRoleById(RealmModel realm, String id) {
         return session.roles().getRoleById(realm, id);
     }
+    
+    @Override
+    @Deprecated
+    public Stream<RoleModel> getRolesByIds(RealmModel realm, Stream<String> ids) {
+        return session.roles().getRolesByIds(realm, ids);
+    }
+
+    @Override
+    public Stream<String> getDeepRoleIdsStream(RealmModel realm, Stream<String> ids) {
+        return session.roles().getDeepRoleIdsStream(realm, ids);
+    }
 
     @Override
     @Deprecated

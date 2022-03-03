@@ -31,10 +31,12 @@ import org.keycloak.models.utils.RoleUtils;
 import javax.persistence.EntityManager;
 import javax.persistence.TypedQuery;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Stream;
 import javax.persistence.LockModeType;
 
@@ -247,7 +249,22 @@ public class GroupAdapter implements GroupModel.Streams , JpaModel<GroupEntity> 
         // even if we're getting just the id.
         TypedQuery<String> query = em.createNamedQuery("groupRoleMappingIds", String.class);
         query.setParameter("group", getEntity());
-        return closing(query.getResultStream().map(realm::getRoleById).filter(Objects::nonNull));
+        return realm.getRolesByIds(closing(query.getResultStream()));
+    }
+    
+    @Override
+    public Stream<RoleModel> getDeepRoleMappingsStream() {
+        Set<String> groupIds = new HashSet<>();
+        GroupModel group = this;
+        while (group != null) {
+            groupIds.add(group.getId());
+            group = group.getParent();
+        }
+        
+        TypedQuery<String> query = em.createNamedQuery("groupListRoleMappingIds", String.class);
+        query.setParameter("groupids", groupIds);
+        // TODO: incorrect! This must expand the roles to include the children roles
+        return realm.getRolesByIds(closing(query.getResultStream()));
     }
 
     @Override

@@ -43,6 +43,23 @@ public interface RoleLookupProvider {
     RoleModel getRoleById(RealmModel realm, String id);
 
     /**
+     * Exact search for multiple roles by their internal ID.
+     * @param realm Realm.
+     * @param ids the Internal IDs of the roles.
+     * @return Model of the role.
+     */
+    Stream<RoleModel> getRolesByIds(RealmModel realm, Stream<String> ids);
+
+    /**
+     * Augments the specified role IDs with the entire set of children role IDs (expanding composites).
+     *
+     * @param realm Realm. Cannot be {@code null}.
+     * @param ids Stream of ids. Returns empty {@code Stream} when {@code null}.
+     * @return Stream of expanded role IDs. Never returns {@code null}.
+     */
+    Stream<String> getDeepRoleIdsStream(RealmModel realm, Stream<String> ids);
+
+    /**
      * Case-insensitive search for roles that contain the given string in their name or description.
      * @param realm Realm.
      * @param search Searched substring of the role's name or description.

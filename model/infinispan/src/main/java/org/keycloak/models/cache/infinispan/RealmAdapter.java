@@ -731,6 +731,12 @@ public class RealmAdapter implements CachedRealmModel {
         if (isUpdated()) return updated.getRoleById(id);
         return cacheSession.getRoleById(this, id);
      }
+    
+    @Override
+    public Stream<RoleModel> getRolesByIds(Stream<String> ids) {
+        if (isUpdated()) return updated.getRolesByIds(ids);
+        return cacheSession.getRolesByIds(this, ids);
+    }
 
     @Override
     public Stream<GroupModel> getDefaultGroupsStream() {

@@ -100,6 +100,14 @@ public class MapUserProvider implements UserProvider.Streams, UserCredentialStor
             public boolean checkUsernameUniqueness(RealmModel realm, String username) {
                 return getUserByUsername(realm, username) != null;
             }
+
+            @Override
+            public Stream<RoleModel> getDeepRoleMappingsStream() {
+                // TODO This is so weird to have this here!!! Design issue? 
+                return null;
+            }
+            
+            
         };
     }
 

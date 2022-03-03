@@ -23,6 +23,7 @@ import static org.keycloak.utils.StreamsUtil.closing;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -422,6 +423,44 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
         RoleAdapter adapter = new RoleAdapter(session, realm, em, entity);
         return adapter;
     }
+    
+    @Override
+    public Stream<RoleModel> getRolesByIds(RealmModel realm, Stream<String> ids) {
+        if (ids == null) return Stream.empty();
+
+        TypedQuery<RoleEntity> query;
+
+        query = em.createNamedQuery("getRolesFromIdList", RoleEntity.class)
+                .setParameter("realm", realm.getId())
+                .setParameter("ids", ids.collect(Collectors.toList()));
+
+        return closing(query.getResultStream().map(entity -> new RoleAdapter(session, realm, em, entity)));
+    }
+
+    @Override
+    public Stream<String> getDeepRoleIdsStream(RealmModel realm, Stream<String> roleIds) {
+        if (roleIds == null) return Stream.empty();
+        
+        Set<String> collectedRoleIds = new HashSet<>(roleIds.collect(Collectors.toList()));
+        Set<String> roleIdsToCollectChildRoleIdsFrom = new HashSet<>(collectedRoleIds);
+        // Keep track of already visited composite roles ids, so that children collection happens only once
+        Set<String> alreadyVisitedRolesIds = new HashSet<>(roleIdsToCollectChildRoleIdsFrom);
+        
+        while (!roleIdsToCollectChildRoleIdsFrom.isEmpty()) {
+            TypedQuery<String> query = em.createNamedQuery("getChildRoleIdsForCompositeIds", String.class);
+            query.setParameter("roleIds", roleIdsToCollectChildRoleIdsFrom);
+            
+            List<String> childRoleIds = query.getResultList();
+            collectedRoleIds.addAll(childRoleIds);
+            alreadyVisitedRolesIds.addAll(roleIdsToCollectChildRoleIdsFrom);
+            roleIdsToCollectChildRoleIdsFrom = childRoleIds.stream()
+                    .filter(roleId -> !alreadyVisitedRolesIds.contains(roleId))
+                    .collect(Collectors.toSet());
+        }
+        
+        return collectedRoleIds.stream();
+    }
+
 
     @Override
     public GroupModel getGroupById(RealmModel realm, String id) {

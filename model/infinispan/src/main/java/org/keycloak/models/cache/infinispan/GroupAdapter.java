@@ -197,6 +197,12 @@ public class GroupAdapter implements GroupModel.Streams {
         }
         return roles.stream();
     }
+    
+    @Override
+    public Stream<RoleModel> getDeepRoleMappingsStream() {
+        if (isUpdated()) return updated.getRoleMappingsStream();
+        return null;
+    }
 
     @Override
     public void deleteRoleMapping(RoleModel role) {

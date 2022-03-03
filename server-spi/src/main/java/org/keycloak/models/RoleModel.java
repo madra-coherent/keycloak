@@ -52,6 +52,8 @@ public interface RoleModel {
 
     boolean isComposite();
 
+    Set<String> getCompositeRoleIds();
+
     void addCompositeRole(RoleModel role);
 
     void removeCompositeRole(RoleModel role);

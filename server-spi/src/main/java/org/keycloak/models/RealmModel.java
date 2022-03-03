@@ -325,6 +325,13 @@ public interface RealmModel extends RoleContainerModel {
     RoleModel getRoleById(String id);
 
     /**
+     * Provides roles which have the specified ids.
+     * @param ids the ids of the role to retrieve
+     * @return the roles
+     */
+    Stream<RoleModel> getRolesByIds(Stream<String> ids);
+
+    /**
      * @deprecated Use {@link #getDefaultGroupsStream() getDefaultGroupsStream} instead.
      */
     @Deprecated

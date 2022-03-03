@@ -17,16 +17,6 @@
 
 package org.keycloak.models.jpa;
 
-import org.keycloak.models.KeycloakSession;
-import org.keycloak.models.RealmModel;
-import org.keycloak.models.RoleContainerModel;
-import org.keycloak.models.RoleModel;
-import org.keycloak.models.jpa.entities.RoleAttributeEntity;
-import org.keycloak.models.jpa.entities.RoleEntity;
-import org.keycloak.models.utils.KeycloakModelUtils;
-
-import javax.persistence.EntityManager;
-import javax.persistence.Query;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -34,7 +24,23 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Stream;
+
+import javax.persistence.EntityManager;
+import javax.persistence.Persistence;
+import javax.persistence.Query;
+import javax.persistence.TypedQuery;
+
+import org.keycloak.models.KeycloakSession;
+import org.keycloak.models.RealmModel;
+import org.keycloak.models.RoleContainerModel;
+import org.keycloak.models.RoleModel;
+import org.keycloak.models.jpa.entities.CompositeRoleEntity;
+import org.keycloak.models.jpa.entities.CompositeRoleEntityKey;
+import org.keycloak.models.jpa.entities.RoleAttributeEntity;
+import org.keycloak.models.jpa.entities.RoleEntity;
+import org.keycloak.models.utils.KeycloakModelUtils;
 
 /**
  * @author <a href="mailto:bill@burkecentral.com">Bill Burke</a>
@@ -89,16 +95,50 @@ public class RoleAdapter implements RoleModel, JpaModel<RoleEntity> {
 
     @Override
     public boolean isComposite() {
-        return getCompositesStream().count() > 0;
+        TypedQuery<String> query = em.createNamedQuery("getChildrenRoleIds", String.class);
+        query.setParameter("roleId", getId());
+        query.setMaxResults(1);
+        return !query.getResultList().isEmpty();
+    }
+
+    @Override
+    public Set<String> getCompositeRoleIds() {
+        TypedQuery<String> query = em.createNamedQuery("getChildrenRoleIds", String.class);
+        query.setParameter("roleId", getId());
+        return new HashSet<>(query.getResultList());
     }
 
     @Override
     public void addCompositeRole(RoleModel role) {
+        // Avoid lazy loading the composite role collection if not already done
+        if (Persistence.getPersistenceUtil().isLoaded(getEntity(), "compositeRoles")) {
+            addCompositeRoleUsingLoadedCompositeCollection(role);
+        }
+        else {
+            addCompositeRoleWithoutLoadingCompositeCollection(role);
+        }
+    }
+
+    private void addCompositeRoleUsingLoadedCompositeCollection(RoleModel role) {
         RoleEntity entity = toRoleEntity(role);
+        // Why performing this loop at all? The semantic of Set.add(T) ensures that the operation
+        // is performed only if there is not entry already...
         for (RoleEntity composite : getEntity().getCompositeRoles()) {
             if (composite.equals(entity)) return;
         }
         getEntity().getCompositeRoles().add(entity);
+    }
+
+    private void addCompositeRoleWithoutLoadingCompositeCollection(RoleModel role) {
+        RoleEntity thisRoleEntity = toRoleEntity(this);
+        RoleEntity childRoleEntity = toRoleEntity(role);
+        // Ensure that the entry does not exist already - will hit the database,
+        // but it's required to maintain the semantic of method #addCompositeRole(RoleModel)
+        CompositeRoleEntityKey compositeKey = new CompositeRoleEntityKey(thisRoleEntity.getId(), childRoleEntity.getId());
+        if (em.find(CompositeRoleEntity.class, compositeKey) == null) {
+            CompositeRoleEntity composite = new CompositeRoleEntity(compositeKey);
+            em.persist(composite);
+        }
     }
 
     @Override
@@ -112,7 +152,29 @@ public class RoleAdapter implements RoleModel, JpaModel<RoleEntity> {
         Stream<RoleModel> composites = getEntity().getCompositeRoles().stream().map(c -> new RoleAdapter(session, realm, em, c));
         return composites.filter(Objects::nonNull);
     }
-
+    
+//    @Override
+//    public Stream<RoleModel> getDeepCompositesStream() {
+//        Set<String> collectedRoleIds = new HashSet<>();
+//
+//        Set<String> roleIdsToCollectChildrenRoleIdsFrom = new HashSet<>(Arrays.asList(role.getId()));
+//        while (!roleIdsToCollectChildrenRoleIdsFrom.isEmpty()) {
+//            TypedQuery<String> query = em.createNamedQuery("getChildRoleIdsForCompositeIds", String.class);
+//            query.setParameter("roleIds", roleIdsToCollectChildrenRoleIdsFrom);
+//            
+//            roleIdsToCollectChildrenRoleIdsFrom = new HashSet<>(query.getResultList());
+//            collectedRoleIds.addAll(roleIdsToCollectChildrenRoleIdsFrom);
+//        }
+//        
+//        if (collectedRoleIds.isEmpty()) {
+//            return Stream.empty();
+//        }
+//        
+//        TypedQuery<RoleEntity> query = em.createNamedQuery("getRolesFromIdList", RoleEntity.class);
+//        query.setParameter("ids", collectedRoleIds);
+//        return query.getResultList().stream().map(entity -> new RoleAdapter(session, realm, em, entity));
+//    }
+//
     @Override
     public Stream<RoleModel> getCompositesStream(String search, Integer first, Integer max) {
         return session.roles().getRolesStream(realm,

@@ -24,9 +24,11 @@ import org.keycloak.models.RealmModel;
 import org.keycloak.models.RoleModel;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 
@@ -166,8 +168,19 @@ public class MapGroupAdapter extends AbstractGroupModel<MapGroupEntity> {
     @Override
     public Stream<RoleModel> getRoleMappingsStream() {
         Set<String> grantedRoles = entity.getGrantedRoles();
-        return grantedRoles == null ? Stream.empty() : grantedRoles.stream()
-            .map(roleId -> session.roles().getRoleById(realm, roleId));
+        return session.roles().getRolesByIds(realm, grantedRoles == null ? Stream.empty() : grantedRoles.stream());
+    }
+
+    @Override
+    public Stream<RoleModel> getDeepRoleMappingsStream() {
+        Set<String> roleIds = new HashSet<>();
+        GroupModel group = this;
+        while (group != null) {
+            roleIds.addAll(group.getRoleMappingsStream().map(RoleModel::getId).collect(Collectors.toList()));
+            group = group.getParent();
+        }
+        
+        return session.roles().getRolesByIds(realm, session.roles().getDeepRoleIdsStream(realm, roleIds.stream()));
     }
 
     @Override

@@ -38,6 +38,7 @@ import java.io.Serializable;
         @NamedQuery(name="groupHasRole", query="select m from GroupRoleMappingEntity m where m.group = :group and m.roleId = :roleId"),
         @NamedQuery(name="groupRoleMappings", query="select m from GroupRoleMappingEntity m where m.group = :group"),
         @NamedQuery(name="groupRoleMappingIds", query="select m.roleId from GroupRoleMappingEntity m where m.group = :group"),
+        @NamedQuery(name="groupListRoleMappingIds", query="select m.roleId from GroupRoleMappingEntity m where m.group in :groupids"),
         @NamedQuery(name="deleteGroupRoleMappingsByRealm", query="delete from  GroupRoleMappingEntity mapping where mapping.group IN (select u from GroupEntity u where u.realm=:realm)"),
         @NamedQuery(name="deleteGroupRoleMappingsByRole", query="delete from GroupRoleMappingEntity m where m.roleId = :roleId"),
         @NamedQuery(name="deleteGroupRoleMappingsByGroup", query="delete from GroupRoleMappingEntity m where m.group = :group")

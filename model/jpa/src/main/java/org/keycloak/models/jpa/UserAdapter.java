@@ -41,10 +41,13 @@ import javax.persistence.criteria.CriteriaQuery;
 import javax.persistence.criteria.Predicate;
 import javax.persistence.criteria.Root;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.persistence.LockModeType;
 
@@ -477,7 +480,23 @@ public class UserAdapter implements UserModel.Streams, JpaModel<UserEntity> {
         // even if we're getting just the id.
         TypedQuery<String> query = em.createNamedQuery("userRoleMappingIds", String.class);
         query.setParameter("user", getEntity());
-        return closing(query.getResultStream().map(realm::getRoleById).filter(Objects::nonNull));
+        return closing(realm.getRolesByIds(query.getResultStream()));
+    }
+
+    
+    @Override
+    public Stream<RoleModel> getDeepRoleMappingsStream() {
+        Set<String> roleIds = new HashSet<>();
+
+        TypedQuery<String> query = em.createNamedQuery("userRoleMappingIds", String.class);
+        query.setParameter("user", getEntity());
+        roleIds.addAll(closing(query.getResultStream()).collect(Collectors.toList()));
+        
+        // TODO: deal with roles attached to group hierarchy as well
+        //cached.getGroups(modelSupplier).forEach(group -> addGroupRoles(group, roleIds));
+        
+        Stream<String> expandedRoleIds = session.roles().getDeepRoleIdsStream(realm, roleIds.stream());
+        return realm.getRolesByIds(expandedRoleIds);
     }
 
     @Override

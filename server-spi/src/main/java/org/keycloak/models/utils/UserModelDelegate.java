@@ -185,6 +185,11 @@ public class UserModelDelegate implements UserModel.Streams {
     }
 
     @Override
+    public Stream<RoleModel> getDeepRoleMappingsStream() {
+        return delegate.getDeepRoleMappingsStream();
+    }
+
+    @Override
     public void deleteRoleMapping(RoleModel role) {
         delegate.deleteRoleMapping(role);
     }

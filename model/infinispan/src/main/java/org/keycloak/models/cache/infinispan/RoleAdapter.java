@@ -25,10 +25,13 @@ import org.keycloak.models.cache.infinispan.entities.CachedRealmRole;
 import org.keycloak.models.cache.infinispan.entities.CachedRole;
 import org.keycloak.models.utils.KeycloakModelUtils;
 
+import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -111,6 +114,12 @@ public class RoleAdapter implements RoleModel {
         if (isUpdated()) return updated.isComposite();
         return cached.isComposite();
     }
+    
+    @Override
+    public Set<String> getCompositeRoleIds() {
+        if (isUpdated()) return updated.getCompositeRoleIds();
+        return cached.getComposites();
+    }
 
     @Override
     public void addCompositeRole(RoleModel role) {
@@ -129,20 +138,12 @@ public class RoleAdapter implements RoleModel {
         if (isUpdated()) return updated.getCompositesStream();
 
         if (composites == null) {
-            composites = new HashSet<>();
-            composites = cached.getComposites().stream()
-                    .map(id -> {
-                        RoleModel role = realm.getRoleById(id);
-                        if (role == null) {
-                            throw new IllegalStateException("Could not find composite in role " + getName() + ": " + id);
-                        }
-                        return role;
-                    }).collect(Collectors.toSet());
+            composites = realm.getRolesByIds(cached.getComposites().stream()).collect(Collectors.toSet());
         }
 
         return composites.stream();
     }
-
+    
     @Override
     public Stream<RoleModel> getCompositesStream(String search, Integer first, Integer max) {
         if (isUpdated()) return updated.getCompositesStream(search, first, max);

@@ -17,6 +17,7 @@
 
 package org.keycloak.models.utils;
 
+import org.jboss.logging.Logger;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.GroupModel;
 import org.keycloak.models.RealmModel;
@@ -174,7 +175,7 @@ public class RoleUtils {
             while (!stack.isEmpty()) {
                 RoleModel current = stack.pop();
                 sb.add(current);
-
+                
                 if (current.isComposite()) {
                     current.getCompositesStream()
                             .filter(r -> !visited.contains(r))
@@ -189,11 +190,24 @@ public class RoleUtils {
         return sb.build();
     }
 
-
     /**
      * @param roles
      * @return new set with composite roles expanded
      */
+//    public static Set<RoleModel> expandCompositeRoles(Set<RoleModel> roles) {
+//        System.out.println(">>>>> expandCompositeRoles: " + roles);
+//        Set<RoleModel> visited = new HashSet<>();
+//
+//        return Stream.of(
+//                // The provided roles themselves
+//                roles.stream(),
+//                // And their composition
+//                roles.stream().flatMap(RoleModel::getDeepCompositesStream)
+//                )
+//                .flatMap(Function.identity())
+//                .collect(Collectors.toSet());
+//    }
+
     public static Set<RoleModel> expandCompositeRoles(Set<RoleModel> roles) {
         Set<RoleModel> visited = new HashSet<>();
 
@@ -201,7 +215,6 @@ public class RoleUtils {
                 .flatMap(roleModel -> RoleUtils.expandCompositeRolesStream(roleModel, visited))
                 .collect(Collectors.toSet());
     }
-
     /**
      * @param roles
      * @return stream with composite roles expanded
@@ -212,15 +225,21 @@ public class RoleUtils {
         return roles.flatMap(roleModel -> RoleUtils.expandCompositeRolesStream(roleModel, visited));
     }
 
-
+    private static final Logger logger = Logger.getLogger(RoleUtils.class);
+    
     /**
      * @param user
      * @return all user role mappings including all groups of user. Composite roles will be expanded
      */
     public static Set<RoleModel> getDeepUserRoleMappings(UserModel user) {
-        Set<RoleModel> roleMappings = user.getRoleMappingsStream().collect(Collectors.toSet());
-        user.getGroupsStream().forEach(group -> addGroupRoles(group, roleMappings));
-        return expandCompositeRoles(roleMappings);
+        Set<RoleModel> result = user.getDeepRoleMappingsStream().collect(Collectors.toSet());
+        logger.infof("Found %d items for user %s", result.size(), user.getUsername());
+        return result;
+//        Set<RoleModel> roleMappings = user.getRoleMappingsStream().collect(Collectors.toSet());
+//        user.getGroupsStream().forEach(group -> addGroupRoles(group, roleMappings));
+//        Set<RoleModel> result = expandCompositeRoles(roleMappings);
+//        logger.infof("Found %d items for user %s", result.size(), user.getUsername());
+//        return result;
     }
 
 

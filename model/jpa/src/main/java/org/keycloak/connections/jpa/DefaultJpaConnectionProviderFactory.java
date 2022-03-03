@@ -199,6 +199,7 @@ public class DefaultJpaConnectionProviderFactory implements JpaConnectionProvide
 
                         properties.put("hibernate.show_sql", config.getBoolean("showSql", false));
                         properties.put("hibernate.format_sql", config.getBoolean("formatSql", true));
+                        properties.put("hibernate.query.in_clause_parameter_padding", config.getBoolean("in_clause_parameter_padding", true));
 
                         Connection connection = getConnection();
                         try {

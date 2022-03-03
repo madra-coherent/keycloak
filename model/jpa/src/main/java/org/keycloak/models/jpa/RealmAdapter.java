@@ -868,6 +868,11 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
     public RoleModel getRoleById(String id) {
         return session.roles().getRoleById(this, id);
     }
+    
+    @Override
+    public Stream<RoleModel> getRolesByIds(Stream<String> ids) {
+        return session.roles().getRolesByIds(this, ids);
+    }
 
     @Override
     public PasswordPolicy getPasswordPolicy() {

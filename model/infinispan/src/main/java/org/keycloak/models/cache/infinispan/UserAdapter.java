@@ -35,7 +35,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -326,6 +328,24 @@ public class UserAdapter implements CachedUserModel.Streams {
         }
         return roles.stream();
     }
+    
+    @Override
+    public Stream<RoleModel> getDeepRoleMappingsStream() {
+        if (updated != null) return updated.getDeepRoleMappingsStream();
+
+        Set<String> roleIds = new HashSet<>(cached.getRoleMappings(modelSupplier));
+        // TODO: deal with roles attached to group hierarchy as well
+        //cached.getGroups(modelSupplier).forEach(group -> addGroupRoles(group, roleIds));
+        
+        Stream<String> expandedRoleIds = keycloakSession.roles().getDeepRoleIdsStream(realm, roleIds.stream());
+        return keycloakSession.roles().getRolesByIds(realm, expandedRoleIds);
+    }
+
+//    private static void addGroupRoles(GroupModel group, Set<String> roleIds) {
+//        roleIds.addAll(group.getRoleMappings().collect(Collectors.toSet()));
+//        if (group.getParentId() == null) return;
+//        addGroupRoles(group.getParent(), roleMappings);
+//    }
 
     @Override
     public void deleteRoleMapping(RoleModel role) {

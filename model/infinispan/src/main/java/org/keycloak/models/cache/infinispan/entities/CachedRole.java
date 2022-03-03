@@ -26,7 +26,6 @@ import org.keycloak.models.cache.infinispan.LazyLoader;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 /**
  * @author <a href="mailto:bill@burkecentral.com">Bill Burke</a>
@@ -43,13 +42,11 @@ public class CachedRole extends AbstractRevisioned implements InRealm {
 
     public CachedRole(Long revision, RoleModel model, RealmModel realm) {
         super(revision, model.getId());
-        composite = model.isComposite();
         description = model.getDescription();
         name = model.getName();
         this.realm = realm.getId();
-        if (composite) {
-            composites.addAll(model.getCompositesStream().map(RoleModel::getId).collect(Collectors.toSet()));
-        }
+        composites.addAll(model.getCompositeRoleIds());
+        composite = !composites.isEmpty();
         attributes = new DefaultLazyLoader<>(roleModel -> new MultivaluedHashMap<>(roleModel.getAttributes()), MultivaluedHashMap::new);
     }
 

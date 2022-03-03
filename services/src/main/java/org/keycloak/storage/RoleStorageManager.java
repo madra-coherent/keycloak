@@ -16,7 +16,12 @@
  */
 package org.keycloak.storage;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.jboss.logging.Logger;
 import org.keycloak.common.util.reflections.Types;
@@ -143,6 +148,42 @@ public class RoleStorageManager implements RoleProvider {
         if (provider == null) return null;
         if (! isStorageProviderEnabled(realm, storageId.getProviderId())) return null;
         return provider.getRoleById(realm, id);
+    }
+
+    @Override
+    public Stream<RoleModel> getRolesByIds(RealmModel realm, Stream<String> ids) {
+        return ids.collect(Collectors.groupingBy(id -> Optional.ofNullable(new StorageId(id).getProviderId()))) // Map<Optional<String>, List<String>>
+                .entrySet().stream()
+                .map(entry -> getRolesByIdsFromProvider(realm, entry.getValue().stream(), entry.getKey()))
+                .flatMap(Function.identity());
+    }
+    
+    private Stream<RoleModel> getRolesByIdsFromProvider(RealmModel realm, Stream<String> ids, Optional<String> providerId) {
+        if (!providerId.isPresent()) {
+            return session.roleLocalStorage().getRolesByIds(realm, ids);
+        }
+        RoleLookupProvider provider = (RoleLookupProvider)getStorageProvider(session, realm, providerId.get());
+        if (provider == null) return Stream.empty();
+        if (! isStorageProviderEnabled(realm, providerId.get())) return Stream.empty();
+        return provider.getRolesByIds(realm, ids);
+    }
+
+    @Override
+    public Stream<String> getDeepRoleIdsStream(RealmModel realm, Stream<String> ids) {
+        return ids.collect(Collectors.groupingBy(id -> Optional.ofNullable(new StorageId(id).getProviderId()))) // Map<Optional<String>, List<String>>
+                .entrySet().stream()
+                .map(entry -> getDeepRoleIdsFromProvider(realm, entry.getValue().stream(), entry.getKey()))
+                .flatMap(Function.identity());
+    }
+
+    private Stream<String> getDeepRoleIdsFromProvider(RealmModel realm, Stream<String> ids, Optional<String> providerId) {
+        if (!providerId.isPresent()) {
+            return session.roleLocalStorage().getDeepRoleIdsStream(realm, ids);
+        }
+        RoleLookupProvider provider = (RoleLookupProvider)getStorageProvider(session, realm, providerId.get());
+        if (provider == null) return Stream.empty();
+        if (! isStorageProviderEnabled(realm, providerId.get())) return Stream.empty();
+        return provider.getDeepRoleIdsStream(realm, ids);
     }
 
     @Override

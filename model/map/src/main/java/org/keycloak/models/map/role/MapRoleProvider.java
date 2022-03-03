@@ -26,9 +26,15 @@ import org.keycloak.models.RealmModel;
 import org.keycloak.models.RoleModel;
 import org.keycloak.models.map.storage.MapKeycloakTransaction;
 
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
 import org.keycloak.models.map.storage.MapStorage;
 import static org.keycloak.common.util.StackUtil.getShortStackTrace;
 import static org.keycloak.models.map.storage.QueryParameters.Order.ASCENDING;
@@ -103,6 +109,36 @@ public class MapRoleProvider implements RoleProvider {
 
         return tx.read(withCriteria(mcb).pagination(first, max, RoleModel.SearchableFields.NAME))
                 .map(entityToAdapterFunc(realm));
+    }
+    
+    @Override
+    public Stream<String> getDeepRoleIdsStream(RealmModel realm, Stream<String> ids) {
+        LOG.tracef("getDeepRoleIdsStream(%s, %s)%s", realm, ids, getShortStackTrace());
+        if (ids == null) return Stream.empty();
+
+        Set<String> collectedRoleIds = new HashSet<>(ids.collect(Collectors.toList()));
+        Set<String> roleIdsToCollectChildRoleIdsFrom = new HashSet<>(collectedRoleIds);
+        // Keep track of already visited composite roles ids, so that children collection happens only once
+        Set<String> alreadyVisitedRolesIds = new HashSet<>(roleIdsToCollectChildRoleIdsFrom);
+        
+        while (!roleIdsToCollectChildRoleIdsFrom.isEmpty()) {
+            DefaultModelCriteria<RoleModel> mcb = criteria();
+            mcb = mcb.compare(RoleModel.SearchableFields.ID, Operator.IN, roleIdsToCollectChildRoleIdsFrom)
+                    .compare(RoleModel.SearchableFields.REALM_ID, Operator.EQ, realm.getId());
+            
+            List<String> childRoleIds = tx.read(withCriteria(mcb))
+                    .map(MapRoleEntity::getCompositeRoles)
+                    .flatMap(Collection::stream)
+                    .collect(Collectors.toList());
+            collectedRoleIds.addAll(childRoleIds);
+            alreadyVisitedRolesIds.addAll(roleIdsToCollectChildRoleIdsFrom);
+            roleIdsToCollectChildRoleIdsFrom = childRoleIds.stream()
+                    .filter(roleId -> !alreadyVisitedRolesIds.contains(roleId))
+                    .collect(Collectors.toSet());
+        }
+        
+        return collectedRoleIds.stream();
+
     }
 
     @Override
@@ -247,6 +283,23 @@ public class MapRoleProvider implements RoleProvider {
         return (entity == null || ! Objects.equals(realmId, entity.getRealmId()))
           ? null
           : entityToAdapterFunc(realm).apply(entity);
+    }
+    
+    @Override
+    public Stream<RoleModel> getRolesByIds(RealmModel realm, Stream<String> ids) {
+        if (ids == null || realm == null || realm.getId() == null) {
+            return Stream.empty();
+        }
+
+        LOG.tracef("getRolesByIds(%s, %s)%s", realm, ids, getShortStackTrace());
+
+        DefaultModelCriteria<RoleModel> mcb = criteria();
+        mcb = mcb.compare(SearchableFields.REALM_ID, Operator.EQ, realm.getId())
+                .compare(SearchableFields.ID, Operator.IN, ids);
+
+        return tx.read(withCriteria(mcb))
+                .filter(entity -> Objects.equals(realm.getId(), entity.getRealmId()))
+                .map(entityToAdapterFunc(realm));
     }
 
     @Override

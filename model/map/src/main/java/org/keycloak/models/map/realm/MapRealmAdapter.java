@@ -526,6 +526,11 @@ public class MapRealmAdapter extends AbstractRealmModel<MapRealmEntity> implemen
     }
 
     @Override
+    public Stream<RoleModel> getRolesByIds(Stream<String> ids) {
+        return session.roles().getRolesByIds(this, ids);
+    }
+
+    @Override
     public Stream<GroupModel> getDefaultGroupsStream() {
         return entity.getDefaultGroupIds().map(this::getGroupById);
     }

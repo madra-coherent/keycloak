@@ -282,6 +282,11 @@ public class InMemoryUserAdapter extends UserModelDefaultMethods.Streams {
     }
 
     @Override
+    public Stream<RoleModel> getDeepRoleMappingsStream() {
+        return realm.getRolesByIds(session.roles().getDeepRoleIdsStream(realm, roleIds.stream()));
+    }
+
+    @Override
     public void deleteRoleMapping(RoleModel role) {
         roleIds.remove(role.getId());
 
