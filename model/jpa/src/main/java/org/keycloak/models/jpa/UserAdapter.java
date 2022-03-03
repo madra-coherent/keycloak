@@ -432,6 +432,10 @@ public class UserAdapter implements UserModel.Streams, JpaModel<UserEntity> {
         return query;
     }
 
+    @Override
+    public boolean hasDirectRole(RoleModel role) {
+        return getUserRoleMappingEntityTypedQuery(role).getResultList().size() > 0;
+    }
 
     @Override
     public boolean hasRole(RoleModel role) {

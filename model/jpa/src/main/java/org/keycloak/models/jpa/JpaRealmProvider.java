@@ -891,18 +891,21 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
         Map<String, ClientScopeModel> existingClientScopes = getClientScopes(realm, client, true);
         existingClientScopes.putAll(getClientScopes(realm, client, false));
 
-        clientScopes.stream()
+        List<ClientScopeClientMappingEntity> entities = clientScopes.stream()
             .filter(clientScope -> ! existingClientScopes.containsKey(clientScope.getName()))
             .filter(clientScope -> Objects.equals(clientScope.getProtocol(), clientProtocol))
-            .forEach(clientScope -> {
+            .map(clientScope -> {
                 ClientScopeClientMappingEntity entity = new ClientScopeClientMappingEntity();
                 entity.setClientScopeId(clientScope.getId());
                 entity.setClientId(client.getId());
                 entity.setDefaultScope(defaultScope);
-                em.persist(entity);
-                em.flush();
-                em.detach(entity);
-            });
+                return entity;
+            })
+            .collect(Collectors.toList());
+        
+        entities.forEach(em::persist);
+        em.flush();
+        entities.forEach(em::detach);
     }
 
     @Override
