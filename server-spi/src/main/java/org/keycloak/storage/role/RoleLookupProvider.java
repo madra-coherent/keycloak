@@ -64,15 +64,6 @@ public interface RoleLookupProvider {
     Stream<RoleModel> getCompositeRolesByIds(RealmModel realm, Stream<CompositeRoleIdentifiersModel> compositeRoleIds);
 
     /**
-     * Augments the specified role IDs with the entire set of children role IDs (expanding composites).
-     *
-     * @param realm Realm. Cannot be {@code null}.
-     * @param ids Stream of ids. Returns empty {@code Stream} when {@code null}.
-     * @return Stream of expanded role IDs. Never returns {@code null}.
-     */
-    Stream<String> getDeepRoleIdsStream(RealmModel realm, Stream<String> ids);
-
-    /**
      * Resolves the specified role IDs with the entire set of children role IDs (expanding composites),
      * retaining the relationship between role and its children (if any).
      *

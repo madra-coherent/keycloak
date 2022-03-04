@@ -484,11 +484,6 @@ public class MapRealmProvider implements RealmProvider {
     }
 
     @Override
-    public Stream<String> getDeepRoleIdsStream(RealmModel realm, Stream<String> ids) {
-        return session.roles().getDeepRoleIdsStream(realm, ids);
-    }
-    
-    @Override
     public Stream<CompositeRoleIdentifiersModel> getDeepCompositeRoleIdsStream(RealmModel realm, Stream<String> ids) {
         return session.roles().getDeepCompositeRoleIdsStream(realm, ids);
     }

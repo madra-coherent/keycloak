@@ -943,11 +943,6 @@ public class RealmCacheSession implements CacheRealmProvider {
     }
     
     @Override
-    public Stream<String> getDeepRoleIdsStream(RealmModel realm, Stream<String> ids) {
-        return getDeepCompositeRoleIdsStream(realm, ids).map(CompositeRoleIdentifiersModel::getRoleId);
-    }
-    
-    @Override
     public Stream<CompositeRoleIdentifiersModel> getDeepCompositeRoleIdsStream(RealmModel realm, Stream<String> ids) {
         if (ids == null) return Stream.empty();
 

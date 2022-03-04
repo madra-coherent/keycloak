@@ -452,30 +452,6 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
     }
 
     @Override
-    public Stream<String> getDeepRoleIdsStream(RealmModel realm, Stream<String> roleIds) {
-        if (roleIds == null) return Stream.empty();
-        
-        Set<String> collectedRoleIds = new HashSet<>(roleIds.collect(Collectors.toList()));
-        Set<String> roleIdsToCollectChildRoleIdsFrom = new HashSet<>(collectedRoleIds);
-        // Keep track of already visited composite roles ids, so that children collection happens only once
-        Set<String> alreadyVisitedRolesIds = new HashSet<>(roleIdsToCollectChildRoleIdsFrom);
-        
-        while (!roleIdsToCollectChildRoleIdsFrom.isEmpty()) {
-            TypedQuery<String> query = em.createNamedQuery("getChildRoleIdsForCompositeIds", String.class);
-            query.setParameter("roleIds", roleIdsToCollectChildRoleIdsFrom);
-            
-            List<String> childRoleIds = query.getResultList();
-            collectedRoleIds.addAll(childRoleIds);
-            alreadyVisitedRolesIds.addAll(roleIdsToCollectChildRoleIdsFrom);
-            roleIdsToCollectChildRoleIdsFrom = childRoleIds.stream()
-                    .filter(roleId -> !alreadyVisitedRolesIds.contains(roleId))
-                    .collect(Collectors.toSet());
-        }
-        
-        return collectedRoleIds.stream();
-    }
-    
-    @Override
     public Stream<CompositeRoleIdentifiersModel> getDeepCompositeRoleIdsStream(RealmModel realm, Stream<String> ids) {
         if (ids == null) return Stream.empty();
 

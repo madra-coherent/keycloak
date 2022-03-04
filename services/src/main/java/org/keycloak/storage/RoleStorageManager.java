@@ -16,8 +16,6 @@
  */
 package org.keycloak.storage;
 
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
@@ -187,25 +185,6 @@ public class RoleStorageManager implements RoleProvider {
         return provider.getCompositeRolesByIds(realm, ids);
     }
     
-
-    @Override
-    public Stream<String> getDeepRoleIdsStream(RealmModel realm, Stream<String> ids) {
-        return ids.collect(Collectors.groupingBy(id -> Optional.ofNullable(new StorageId(id).getProviderId()))) // Map<Optional<String>, List<String>>
-                .entrySet().stream()
-                .map(entry -> getDeepRoleIdsFromProvider(realm, entry.getValue().stream(), entry.getKey()))
-                .flatMap(Function.identity());
-    }
-
-    private Stream<String> getDeepRoleIdsFromProvider(RealmModel realm, Stream<String> ids, Optional<String> providerId) {
-        if (!providerId.isPresent()) {
-            return session.roleLocalStorage().getDeepRoleIdsStream(realm, ids);
-        }
-        RoleLookupProvider provider = (RoleLookupProvider)getStorageProvider(session, realm, providerId.get());
-        if (provider == null) return Stream.empty();
-        if (! isStorageProviderEnabled(realm, providerId.get())) return Stream.empty();
-        return provider.getDeepRoleIdsStream(realm, ids);
-    }
-
     @Override
     public Stream<CompositeRoleIdentifiersModel> getDeepCompositeRoleIdsStream(RealmModel realm, Stream<String> ids) {
         return ids.collect(Collectors.groupingBy(id -> Optional.ofNullable(new StorageId(id).getProviderId()))) // Map<Optional<String>, List<String>>

@@ -31,7 +31,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -113,36 +112,6 @@ public class MapRoleProvider implements RoleProvider {
 
         return tx.read(withCriteria(mcb).pagination(first, max, RoleModel.SearchableFields.NAME))
                 .map(entityToAdapterFunc(realm));
-    }
-    
-    @Override
-    public Stream<String> getDeepRoleIdsStream(RealmModel realm, Stream<String> ids) {
-        LOG.tracef("getDeepRoleIdsStream(%s, %s)%s", realm, ids, getShortStackTrace());
-        if (ids == null) return Stream.empty();
-
-        Set<String> collectedRoleIds = new HashSet<>(ids.collect(Collectors.toList()));
-        Set<String> roleIdsToCollectChildRoleIdsFrom = new HashSet<>(collectedRoleIds);
-        // Keep track of already visited composite roles ids, so that children collection happens only once
-        Set<String> alreadyVisitedRolesIds = new HashSet<>(roleIdsToCollectChildRoleIdsFrom);
-        
-        while (!roleIdsToCollectChildRoleIdsFrom.isEmpty()) {
-            DefaultModelCriteria<RoleModel> mcb = criteria();
-            mcb = mcb.compare(RoleModel.SearchableFields.ID, Operator.IN, roleIdsToCollectChildRoleIdsFrom)
-                    .compare(RoleModel.SearchableFields.REALM_ID, Operator.EQ, realm.getId());
-            
-            List<String> childRoleIds = tx.read(withCriteria(mcb))
-                    .map(MapRoleEntity::getCompositeRoles)
-                    .flatMap(Collection::stream)
-                    .collect(Collectors.toList());
-            collectedRoleIds.addAll(childRoleIds);
-            alreadyVisitedRolesIds.addAll(roleIdsToCollectChildRoleIdsFrom);
-            roleIdsToCollectChildRoleIdsFrom = childRoleIds.stream()
-                    .filter(roleId -> !alreadyVisitedRolesIds.contains(roleId))
-                    .collect(Collectors.toSet());
-        }
-        
-        return collectedRoleIds.stream();
-
     }
     
     @Override
