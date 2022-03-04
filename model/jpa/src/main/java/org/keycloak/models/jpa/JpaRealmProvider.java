@@ -22,8 +22,11 @@ import static org.keycloak.models.jpa.PaginationUtils.paginateQuery;
 import static org.keycloak.utils.StreamsUtil.closing;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -49,6 +52,7 @@ import org.keycloak.models.ClientModel;
 import org.keycloak.models.ClientProvider;
 import org.keycloak.models.ClientScopeModel;
 import org.keycloak.models.ClientScopeProvider;
+import org.keycloak.models.CompositeRoleIdentifiersModel;
 import org.keycloak.models.DeploymentStateProvider;
 import org.keycloak.models.GroupModel;
 import org.keycloak.models.GroupProvider;
@@ -66,6 +70,7 @@ import org.keycloak.models.jpa.entities.ClientAttributeEntity;
 import org.keycloak.models.jpa.entities.ClientEntity;
 import org.keycloak.models.jpa.entities.ClientScopeClientMappingEntity;
 import org.keycloak.models.jpa.entities.ClientScopeEntity;
+import org.keycloak.models.jpa.entities.CompositeRoleEntity;
 import org.keycloak.models.jpa.entities.GroupEntity;
 import org.keycloak.models.jpa.entities.RealmEntity;
 import org.keycloak.models.jpa.entities.RealmLocalizationTextsEntity;
@@ -428,11 +433,20 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
     public Stream<RoleModel> getRolesByIds(RealmModel realm, Stream<String> ids) {
         if (ids == null) return Stream.empty();
 
-        TypedQuery<RoleEntity> query;
-
-        query = em.createNamedQuery("getRolesFromIdList", RoleEntity.class)
+        TypedQuery<RoleEntity> query = em.createNamedQuery("getRolesFromIdList", RoleEntity.class)
                 .setParameter("realm", realm.getId())
                 .setParameter("ids", ids.collect(Collectors.toList()));
+
+        return closing(query.getResultStream().map(entity -> new RoleAdapter(session, realm, em, entity)));
+    }
+    
+    @Override
+    public Stream<RoleModel> getCompositeRolesByIds(RealmModel realm, Stream<CompositeRoleIdentifiersModel> compositeRoleIds) {
+        if (compositeRoleIds == null) return Stream.empty();
+
+        TypedQuery<RoleEntity> query = em.createNamedQuery("getRolesFromIdList", RoleEntity.class)
+                .setParameter("realm", realm.getId())
+                .setParameter("ids", compositeRoleIds.map(CompositeRoleIdentifiersModel::getRoleId).collect(Collectors.toList()));
 
         return closing(query.getResultStream().map(entity -> new RoleAdapter(session, realm, em, entity)));
     }
@@ -460,7 +474,42 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
         
         return collectedRoleIds.stream();
     }
+    
+    @Override
+    public Stream<CompositeRoleIdentifiersModel> getDeepCompositeRoleIdsStream(RealmModel realm, Stream<String> ids) {
+        if (ids == null) return Stream.empty();
 
+        Collection<CompositeRoleIdentifiersModel> collectedCompositeRoleIds = new LinkedList<>();
+        Set<String> roleIdsToCollectChildRoleIdsFrom = ids.collect(Collectors.toSet());
+        Set<String> alreadyVisitedRolesIds = new HashSet<>();
+        
+        while (!roleIdsToCollectChildRoleIdsFrom.isEmpty()) {
+            List<CompositeRoleEntity> compositeRolesEntities = em.createNamedQuery("getCompositeRolesByCompositeIds", CompositeRoleEntity.class)
+                    .setParameter("roleIds", roleIdsToCollectChildRoleIdsFrom)
+                    .getResultList(); 
+
+            // Group all composite child role ids by their composite role id
+            Map<String, Set<String>> compositeRoleIds = compositeRolesEntities.stream()
+                    .collect(Collectors.groupingBy(CompositeRoleEntity::getCompositeId,
+                            Collectors.mapping(CompositeRoleEntity::getChildRoleId, Collectors.toSet())));
+            
+            // Ensure that role ids having no children (therefore not in the result set above) are also collected
+            collectedCompositeRoleIds.addAll(roleIdsToCollectChildRoleIdsFrom.stream()
+                    .map(roleId -> new CompositeRoleIdentifiersModel(roleId, compositeRoleIds.getOrDefault(roleId, Collections.emptySet())))
+                    .collect(Collectors.toList())
+                    );
+            
+            alreadyVisitedRolesIds.addAll(roleIdsToCollectChildRoleIdsFrom);
+
+            roleIdsToCollectChildRoleIdsFrom = compositeRolesEntities.stream()
+                    .map(CompositeRoleEntity::getChildRoleId)
+                    // Remove already visited roles ids
+                    .filter(roleId -> !alreadyVisitedRolesIds.contains(roleId))
+                    .collect(Collectors.toSet());
+        }
+        
+        return collectedCompositeRoleIds.stream();
+    }
 
     @Override
     public GroupModel getGroupById(RealmModel realm, String id) {

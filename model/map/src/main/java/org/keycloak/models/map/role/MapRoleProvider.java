@@ -19,6 +19,7 @@ package org.keycloak.models.map.role;
 
 import org.jboss.logging.Logger;
 import org.keycloak.models.ClientModel;
+import org.keycloak.models.CompositeRoleIdentifiersModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.ModelDuplicateException;
 import org.keycloak.models.RealmModel;
@@ -27,8 +28,11 @@ import org.keycloak.models.RoleModel;
 import org.keycloak.models.map.storage.MapKeycloakTransaction;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
@@ -139,6 +143,42 @@ public class MapRoleProvider implements RoleProvider {
         
         return collectedRoleIds.stream();
 
+    }
+    
+    @Override
+    public Stream<CompositeRoleIdentifiersModel> getDeepCompositeRoleIdsStream(RealmModel realm, Stream<String> ids) {
+        LOG.tracef("getDeepCompositeRoleIdsStream(%s, %s)%s", realm, ids, getShortStackTrace());
+        if (ids == null) return Stream.empty();
+
+        Collection<CompositeRoleIdentifiersModel> collectedCompositeRoleIds = new LinkedList<>();
+        Set<String> roleIdsToCollectChildRoleIdsFrom = ids.collect(Collectors.toSet());
+        // Keep track of already visited composite roles ids, so that children collection happens only once
+        Set<String> alreadyVisitedRolesIds = new HashSet<>();
+        
+        while (!roleIdsToCollectChildRoleIdsFrom.isEmpty()) {
+            DefaultModelCriteria<RoleModel> mcb = criteria();
+            mcb = mcb.compare(RoleModel.SearchableFields.ID, Operator.IN, roleIdsToCollectChildRoleIdsFrom)
+                    .compare(RoleModel.SearchableFields.REALM_ID, Operator.EQ, realm.getId());
+            
+            Map<String, Set<String>> compositeRoleIds = tx.read(withCriteria(mcb))
+                    .collect(Collectors.toMap(MapRoleEntity::getId, MapRoleEntity::getCompositeRoles));
+
+            // Ensure that role ids having no children (may not be in the result set above) are also collected
+            collectedCompositeRoleIds.addAll(roleIdsToCollectChildRoleIdsFrom.stream()
+                    .map(roleId -> new CompositeRoleIdentifiersModel(roleId, compositeRoleIds.getOrDefault(roleId, Collections.emptySet())))
+                    .collect(Collectors.toList())
+                    );
+
+            alreadyVisitedRolesIds.addAll(roleIdsToCollectChildRoleIdsFrom);
+
+            roleIdsToCollectChildRoleIdsFrom = compositeRoleIds.values().stream()
+                    .flatMap(Collection::stream)
+                    // Remove already visited roles ids
+                    .filter(roleId -> !alreadyVisitedRolesIds.contains(roleId))
+                    .collect(Collectors.toSet());
+        }
+        
+        return collectedCompositeRoleIds.stream();
     }
 
     @Override
@@ -302,6 +342,23 @@ public class MapRoleProvider implements RoleProvider {
                 .map(entityToAdapterFunc(realm));
     }
 
+    @Override
+    public Stream<RoleModel> getCompositeRolesByIds(RealmModel realm, Stream<CompositeRoleIdentifiersModel> compositeRoleIds) {
+        if (compositeRoleIds == null || realm == null || realm.getId() == null) {
+            return Stream.empty();
+        }
+
+        LOG.tracef("getCompositeRolesByIds(%s, %s)%s", realm, compositeRoleIds, getShortStackTrace());
+
+        DefaultModelCriteria<RoleModel> mcb = criteria();
+        mcb = mcb.compare(SearchableFields.REALM_ID, Operator.EQ, realm.getId())
+                .compare(SearchableFields.ID, Operator.IN, compositeRoleIds.map(CompositeRoleIdentifiersModel::getRoleId));
+
+        return tx.read(withCriteria(mcb))
+                .filter(entity -> Objects.equals(realm.getId(), entity.getRealmId()))
+                .map(entityToAdapterFunc(realm));
+    }
+    
     @Override
     public Stream<RoleModel> searchForRolesStream(RealmModel realm, String search, Integer first, Integer max) {
         if (search == null) {

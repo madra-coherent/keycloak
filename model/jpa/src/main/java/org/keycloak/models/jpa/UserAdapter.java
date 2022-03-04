@@ -20,6 +20,7 @@ package org.keycloak.models.jpa;
 import org.keycloak.common.util.MultivaluedHashMap;
 import org.keycloak.common.util.ObjectUtil;
 import org.keycloak.models.ClientModel;
+import org.keycloak.models.CompositeRoleIdentifiersModel;
 import org.keycloak.models.GroupModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
@@ -492,8 +493,8 @@ public class UserAdapter implements UserModel.Streams, JpaModel<UserEntity> {
         Set<String> roleIds = new HashSet<>();
         roleIds.addAll(getRoleMappingIdsStream().collect(Collectors.toList()));
         roleIds.addAll(RoleUtils.collectGroupRoleMappingIds(getGroupsStream()));
-        Stream<String> expandedRoleIds = session.roles().getDeepRoleIdsStream(realm, roleIds.stream());
-        return realm.getRolesByIds(expandedRoleIds);
+        Stream<CompositeRoleIdentifiersModel> expandedRoleIds = session.roles().getDeepCompositeRoleIdsStream(realm, roleIds.stream());
+        return session.roles().getCompositeRolesByIds(realm, expandedRoleIds);
     }
 
     @Override

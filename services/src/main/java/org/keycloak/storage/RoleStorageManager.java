@@ -27,6 +27,7 @@ import org.jboss.logging.Logger;
 import org.keycloak.common.util.reflections.Types;
 import org.keycloak.component.ComponentModel;
 import org.keycloak.models.ClientModel;
+import org.keycloak.models.CompositeRoleIdentifiersModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.ModelException;
 import org.keycloak.models.RealmModel;
@@ -167,6 +168,25 @@ public class RoleStorageManager implements RoleProvider {
         if (! isStorageProviderEnabled(realm, providerId.get())) return Stream.empty();
         return provider.getRolesByIds(realm, ids);
     }
+    
+    @Override
+    public Stream<RoleModel> getCompositeRolesByIds(RealmModel realm, Stream<CompositeRoleIdentifiersModel> ids) {
+        return ids.collect(Collectors.groupingBy(composite -> Optional.ofNullable(new StorageId(composite.getRoleId()).getProviderId()))) // Map<Optional<String>, List<String>>
+                .entrySet().stream()
+                .map(entry -> getCompositeRolesByIdsFromProvider(realm, entry.getValue().stream(), entry.getKey()))
+                .flatMap(Function.identity());
+    }
+
+    private Stream<RoleModel> getCompositeRolesByIdsFromProvider(RealmModel realm, Stream<CompositeRoleIdentifiersModel> ids, Optional<String> providerId) {
+        if (!providerId.isPresent()) {
+            return session.roleLocalStorage().getCompositeRolesByIds(realm, ids);
+        }
+        RoleLookupProvider provider = (RoleLookupProvider)getStorageProvider(session, realm, providerId.get());
+        if (provider == null) return Stream.empty();
+        if (! isStorageProviderEnabled(realm, providerId.get())) return Stream.empty();
+        return provider.getCompositeRolesByIds(realm, ids);
+    }
+    
 
     @Override
     public Stream<String> getDeepRoleIdsStream(RealmModel realm, Stream<String> ids) {
@@ -184,6 +204,24 @@ public class RoleStorageManager implements RoleProvider {
         if (provider == null) return Stream.empty();
         if (! isStorageProviderEnabled(realm, providerId.get())) return Stream.empty();
         return provider.getDeepRoleIdsStream(realm, ids);
+    }
+
+    @Override
+    public Stream<CompositeRoleIdentifiersModel> getDeepCompositeRoleIdsStream(RealmModel realm, Stream<String> ids) {
+        return ids.collect(Collectors.groupingBy(id -> Optional.ofNullable(new StorageId(id).getProviderId()))) // Map<Optional<String>, List<String>>
+                .entrySet().stream()
+                .map(entry -> getDeepCompositeRoleIdsFromProvider(realm, entry.getValue().stream(), entry.getKey()))
+                .flatMap(Function.identity());
+    }
+
+    private Stream<CompositeRoleIdentifiersModel> getDeepCompositeRoleIdsFromProvider(RealmModel realm, Stream<String> ids, Optional<String> providerId) {
+        if (!providerId.isPresent()) {
+            return session.roleLocalStorage().getDeepCompositeRoleIdsStream(realm, ids);
+        }
+        RoleLookupProvider provider = (RoleLookupProvider)getStorageProvider(session, realm, providerId.get());
+        if (provider == null) return Stream.empty();
+        if (! isStorageProviderEnabled(realm, providerId.get())) return Stream.empty();
+        return provider.getDeepCompositeRoleIdsStream(realm, ids);
     }
 
     @Override

@@ -18,6 +18,7 @@ package org.keycloak.storage.role;
 
 import java.util.stream.Stream;
 import org.keycloak.models.ClientModel;
+import org.keycloak.models.CompositeRoleIdentifiersModel;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.RoleModel;
 
@@ -52,6 +53,17 @@ public interface RoleLookupProvider {
     Stream<RoleModel> getRolesByIds(RealmModel realm, Stream<String> ids);
 
     /**
+     * Specialized exact search for multiple roles by their internal ID, with already known composite child ids
+     * (which saves loading them from the provider again).
+     * discarding the known composite child IDs entirely.
+     * Important: no ordering is specified, so sorting must performed onto the result if appropriate 
+     * @param realm Realm.
+     * @param compositeRoleIds the stream of roles identifiers, containing both their own ID and their child role IDs.
+     * @return Stream of {@link RoleModel}.
+     */
+    Stream<RoleModel> getCompositeRolesByIds(RealmModel realm, Stream<CompositeRoleIdentifiersModel> compositeRoleIds);
+
+    /**
      * Augments the specified role IDs with the entire set of children role IDs (expanding composites).
      *
      * @param realm Realm. Cannot be {@code null}.
@@ -60,6 +72,16 @@ public interface RoleLookupProvider {
      */
     Stream<String> getDeepRoleIdsStream(RealmModel realm, Stream<String> ids);
 
+    /**
+     * Resolves the specified role IDs with the entire set of children role IDs (expanding composites),
+     * retaining the relationship between role and its children (if any).
+     *
+     * @param realm Realm. Cannot be {@code null}.
+     * @param ids non-null Stream of composite role identifiers. Returns empty {@code Stream} when {@code null}.
+     * @return non-null Stream of {@link CompositeRoleIdentifiersModel}.
+     */
+    Stream<CompositeRoleIdentifiersModel> getDeepCompositeRoleIdsStream(RealmModel realm, Stream<String> ids);
+    
     /**
      * Case-insensitive search for roles that contain the given string in their name or description.
      * @param realm Realm.

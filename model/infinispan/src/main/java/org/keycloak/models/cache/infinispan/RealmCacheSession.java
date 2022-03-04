@@ -26,6 +26,7 @@ import org.keycloak.models.cache.CachedRealmModel;
 import org.keycloak.models.cache.infinispan.entities.*;
 import org.keycloak.models.cache.infinispan.events.*;
 import org.keycloak.models.utils.KeycloakModelUtils;
+import org.keycloak.models.utils.RoleModelDelegate;
 import org.keycloak.storage.StorageId;
 import org.keycloak.storage.client.ClientStorageProviderModel;
 
@@ -866,9 +867,7 @@ public class RealmCacheSession implements CacheRealmProvider {
 
     @Override
     public Stream<RoleModel> getRolesByIds(RealmModel realm, Stream<String> ids) {
-        if (ids == null) {
-            return Stream.empty();
-        }
+        if (ids == null) return Stream.empty();
         
         Map<Boolean, Set<String>> idsByInvalidationStatus = ids.collect(Collectors.groupingBy(invalidations::contains, Collectors.toSet()));
         // Ensure that both entries exist in the by-invalidation status ids map - avoids null checks downstream
@@ -899,30 +898,74 @@ public class RealmCacheSession implements CacheRealmProvider {
                 rolesFromDelegate
                 ).flatMap(Function.identity());
     }
-
+    
+    @Override
+    public Stream<RoleModel> getCompositeRolesByIds(RealmModel realm, Stream<CompositeRoleIdentifiersModel> compositeRoleIds) {
+        if (compositeRoleIds == null) return Stream.empty();
+        
+        Map<String, CompositeRoleIdentifiersModel> keyedCompositeRoleIds =
+                compositeRoleIds.collect(Collectors.toMap(CompositeRoleIdentifiersModel::getRoleId, Function.identity()));
+        
+        Map<Boolean, Set<CompositeRoleIdentifiersModel>> idsByInvalidationStatus = keyedCompositeRoleIds.values().stream()
+                .collect(Collectors.groupingBy(composite -> invalidations.contains(composite.getRoleId()), Collectors.toSet()));
+        
+        // Ensure that both entries exist in the by-invalidation status ids map - avoids null checks downstream
+        idsByInvalidationStatus.putIfAbsent(Boolean.TRUE, Collections.emptySet());
+        idsByInvalidationStatus.putIfAbsent(Boolean.FALSE, Collections.emptySet());
+        
+        // Only perform cache lookup for not invalidated ids
+        Map<CompositeRoleIdentifiersModel, Optional<RoleModel>> cachedRoleLookup = idsByInvalidationStatus.get(Boolean.FALSE).stream()
+                .collect(Collectors.toMap(Function.identity(),
+                        composite -> Optional.ofNullable(toManagedRole(realm, getRoleFromCache(realm, composite.getRoleId())))));
+        
+        Set<CompositeRoleIdentifiersModel> invalidatedIds = idsByInvalidationStatus.get(Boolean.TRUE); 
+        Stream<CompositeRoleIdentifiersModel> missingRoleIds = Stream.of(
+                invalidatedIds.stream(),
+                // Add cache misses to the list of ids to retrieve from delegate
+                cachedRoleLookup.entrySet().stream().filter(entry -> !entry.getValue().isPresent()).map(Map.Entry::getKey)
+                )
+                .flatMap(Function.identity());
+        
+        Stream<RoleModel> rolesFromDelegate = getRoleDelegate().getCompositeRolesByIds(realm, missingRoleIds)
+                // Convert only the non invalidated roles to cached, managed roles 
+                .map(role -> invalidatedIds.contains(keyedCompositeRoleIds.get(role.getId())) ?
+                        role
+                        : addRoleToManagedRoles(realm, addRoleToCache(realm, new ComposedRoleModel(role, keyedCompositeRoleIds.get(role.getId())))))
+                ;
+        // TODO: add check that all missing roles have been indeed collected - if not, this means that the initial
+        // caller provided a wrong set of ids, maybe because relying on stale data
+        // Need a way to signal that upstream? How? Using a nullable Optional?
+        
+        return Stream.of(
+                cachedRoleLookup.values().stream().filter(Optional::isPresent).map(Optional::get), // keep only the cache hits
+                rolesFromDelegate
+                ).flatMap(Function.identity());
+    }
+    
     @Override
     public Stream<String> getDeepRoleIdsStream(RealmModel realm, Stream<String> ids) {
-        if (ids == null) {
-            return Stream.empty();
-        }
+        return getDeepCompositeRoleIdsStream(realm, ids).map(CompositeRoleIdentifiersModel::getRoleId);
+    }
+    
+    @Override
+    public Stream<CompositeRoleIdentifiersModel> getDeepCompositeRoleIdsStream(RealmModel realm, Stream<String> ids) {
+        if (ids == null) return Stream.empty();
 
-        Set<String> collectedRoleIds = new HashSet<>();
+        Set<CompositeRoleIdentifiersModel> collectedRoleIds = new HashSet<>();
         Set<String> roleIdsMissingFromCache = new HashSet<>();
 
         // First, scan the cached roles deeply to collect children 
         ids.forEach(roleId -> visitAndCollectChildRoles(realm, roleId, new HashSet<>(), collectedRoleIds, roleIdsMissingFromCache));
         // Then expand role ids which cannot be retrieved from cache using delegate
-        collectedRoleIds.addAll(getRoleDelegate().getDeepRoleIdsStream(realm, roleIdsMissingFromCache.stream()).collect(Collectors.toList()));
+        collectedRoleIds.addAll(getRoleDelegate().getDeepCompositeRoleIdsStream(realm, roleIdsMissingFromCache.stream()).collect(Collectors.toList()));
         
         return collectedRoleIds.stream();
     }
-    
+
     private void visitAndCollectChildRoles(RealmModel realm, String roleId,
-            Set<String> alreadyVisitedRolesIds, Set<String> collectedRoleIds, Set<String> missingRoleIds) {
-        if (!alreadyVisitedRolesIds.add(roleId)) {
-            // Already visited
-            return;
-        }
+            Set<String> alreadyVisitedRolesIds, Set<CompositeRoleIdentifiersModel> collectedRoleIds, Set<String> missingRoleIds) {
+        // Stop if already visited
+        if (!alreadyVisitedRolesIds.add(roleId)) return;
         
         CachedRole cachedRole = getRoleFromCache(realm, roleId);
         if (cachedRole == null || invalidations.contains(roleId)) {
@@ -930,9 +973,10 @@ public class RealmCacheSession implements CacheRealmProvider {
             missingRoleIds.add(roleId);
             return;
         }
-        collectedRoleIds.add(roleId);
+        collectedRoleIds.add(new CompositeRoleIdentifiersModel(cachedRole.getId(), cachedRole.getComposites()));
         cachedRole.getComposites().forEach(childRoleId -> visitAndCollectChildRoles(realm, childRoleId, alreadyVisitedRolesIds, collectedRoleIds, missingRoleIds));
     }
+    
 
     @Override
     public GroupModel getGroupById(RealmModel realm, String id) {

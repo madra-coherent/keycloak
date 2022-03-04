@@ -19,6 +19,7 @@ package org.keycloak.storage.adapter;
 import org.keycloak.common.util.MultivaluedHashMap;
 import org.keycloak.common.util.Time;
 import org.keycloak.models.ClientModel;
+import org.keycloak.models.CompositeRoleIdentifiersModel;
 import org.keycloak.models.GroupModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
@@ -297,7 +298,8 @@ public class InMemoryUserAdapter extends UserModelDefaultMethods.Streams {
         Set<String> collectedRoleIds = new HashSet<>(roleIds);
         collectedRoleIds.addAll(roleIds);
         collectedRoleIds.addAll(RoleUtils.collectGroupRoleMappingIds(getGroupsStream()));
-        return realm.getRolesByIds(session.roles().getDeepRoleIdsStream(realm, collectedRoleIds.stream()));
+        Stream<CompositeRoleIdentifiersModel> expandedRoleIds = session.roles().getDeepCompositeRoleIdsStream(realm, roleIds.stream());
+        return session.roles().getCompositeRolesByIds(realm, expandedRoleIds);
     }
 
     @Override
