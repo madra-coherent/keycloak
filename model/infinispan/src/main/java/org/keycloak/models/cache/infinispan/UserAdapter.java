@@ -303,8 +303,7 @@ public class UserAdapter implements CachedUserModel.Streams {
     public boolean hasRole(RoleModel role) {
         if (updated != null) return updated.hasRole(role);
         return cached.getRoleMappings(modelSupplier).contains(role.getId()) ||
-                getRoleMappingsStream().anyMatch(r -> r.hasRole(role)) ||
-                RoleUtils.hasRoleFromGroup(getGroupsStream(), role, true);
+                getDeepRoleMappingsStream().anyMatch(r -> r.getId().equals(role.getId()));
     }
 
     @Override
@@ -359,7 +358,7 @@ public class UserAdapter implements CachedUserModel.Streams {
         roleIds.addAll(RoleUtils.collectGroupRoleMappingIds(groups.stream()));
         
         Stream<CompositeRoleIdentifiersModel> expandedRoleIds = keycloakSession.roles().getDeepCompositeRoleIdsStream(realm, roleIds.stream());
-        return keycloakSession.roles().getCompositeRolesByIds(realm, expandedRoleIds);
+        return keycloakSession.roles().getCompositeRolesByIds(Collections.singleton(realm), expandedRoleIds);
     }
 
     @Override

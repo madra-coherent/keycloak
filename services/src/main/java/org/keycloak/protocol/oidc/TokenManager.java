@@ -578,7 +578,7 @@ public class TokenManager {
 
 
     public static Set<RoleModel> getAccess(UserModel user, ClientModel client, Stream<ClientScopeModel> clientScopes) {
-        Set<RoleModel> roleMappings = RoleUtils.getDeepUserRoleMappings(user);
+        Set<RoleModel> roleMappings = user.getDeepRoleMappingsStream().collect(Collectors.toSet());
 
         if (client.isFullScopeAllowed()) {
             if (logger.isTraceEnabled()) {

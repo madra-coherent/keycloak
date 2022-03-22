@@ -26,6 +26,13 @@ import org.keycloak.storage.clientscope.ClientScopeLookupProvider;
 public interface ClientScopeProvider extends Provider, ClientScopeLookupProvider {
 
     /**
+     * Returns the IDs of all the client scopes of the given realm as a stream.
+     * @param realm Realm.
+     * @return Stream of the client scope IDs. Never returns {@code null}.
+     */
+    Stream<String> getClientScopeIdsStream(RealmModel realm);
+
+    /**
      * Returns all the client scopes of the given realm as a stream.
      * @param realm Realm.
      * @return Stream of the client scopes. Never returns {@code null}.

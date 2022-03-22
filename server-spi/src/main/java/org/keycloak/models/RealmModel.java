@@ -817,6 +817,8 @@ public interface RealmModel extends RoleContainerModel {
 
     ClientModel getMasterAdminClient();
 
+    String getMasterAdminClientId();
+
     void setMasterAdminClient(ClientModel client);
 
     /**
@@ -824,6 +826,12 @@ public interface RealmModel extends RoleContainerModel {
      * @return Default role of this realm
      */
     RoleModel getDefaultRole();
+
+    /**
+     * Returns the internal ID of the default realm role. See {@link #getDefaultRole()} for more information. 
+     * @return the ID of the default role of this realm or null if not defined 
+     */
+    String getDefaultRoleId();
 
     /**
      * Sets default role for this realm
@@ -946,6 +954,12 @@ public interface RealmModel extends RoleContainerModel {
     }
 
     /**
+     * Returns all client scope IDs of this realm as a stream.
+     * @return Stream of {@link ClientScopeModel} IDs. Never returns {@code null}.
+     */
+    Stream<String> getClientScopeIdsStream();
+
+    /**
      * Returns all client scopes of this realm as a stream.
      * @return Stream of {@link ClientScopeModel}. Never returns {@code null}.
      */
@@ -1017,6 +1031,12 @@ public interface RealmModel extends RoleContainerModel {
     }
 
     /**
+     * Returns default client scopes of this realm.
+     * @return Stream of client scope IDs. Never returns {@code null}.
+     */
+    Stream<String> getDefaultClientScopeIdsStream();
+
+    /**
      * Returns default client scopes of this realm either default ones or optional ones.
      * @param defaultScope if {@code true} default client scopes are returned, 
      * if {@code false} optional client scopes are returned.
@@ -1037,4 +1057,7 @@ public interface RealmModel extends RoleContainerModel {
     void removeClientInitialAccessModel(String id);
     Stream<ClientInitialAccessModel> getClientInitialAccesses();
     void decreaseRemainingCount(ClientInitialAccessModel clientInitialAccess);
+    
+    default void release() {
+    }
 }

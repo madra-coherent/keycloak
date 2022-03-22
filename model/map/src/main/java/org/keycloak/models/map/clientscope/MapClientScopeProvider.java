@@ -67,6 +67,15 @@ public class MapClientScopeProvider implements ClientScopeProvider {
     }
 
     @Override
+    public Stream<String> getClientScopeIdsStream(RealmModel realm) {
+        DefaultModelCriteria<ClientScopeModel> mcb = criteria();
+        mcb = mcb.compare(SearchableFields.REALM_ID, Operator.EQ, realm.getId());
+
+        return tx.read(withCriteria(mcb).orderBy(SearchableFields.NAME, ASCENDING))
+          .map(MapClientScopeEntity::getId);
+    }
+
+    @Override
     public Stream<ClientScopeModel> getClientScopesStream(RealmModel realm) {
         DefaultModelCriteria<ClientScopeModel> mcb = criteria();
         mcb = mcb.compare(SearchableFields.REALM_ID, Operator.EQ, realm.getId());

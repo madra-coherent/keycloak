@@ -20,6 +20,7 @@ package org.keycloak.models.map.realm;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.jboss.logging.Logger;
 import static org.keycloak.common.util.StackUtil.getShortStackTrace;
@@ -110,10 +111,21 @@ public class MapRealmProvider implements RealmProvider {
     }
 
     @Override
+    public Stream<String> getRealmIdsStream() {
+        return tx.read(withCriteria(criteria())).map(MapRealmEntity::getId);
+    }
+
+    public Stream<RealmModel> getRealmsByIdsStream(Stream<String> ids) {
+        DefaultModelCriteria<RealmModel> mcb = criteria();
+        mcb = mcb.compare(SearchableFields.ID, Operator.IN, ids.collect(Collectors.toSet()));
+        return getRealmsStream(mcb);
+    }
+    
+    @Override
     public Stream<RealmModel> getRealmsStream() {
         return getRealmsStream(criteria());
     }
-
+    
     @Override
     public Stream<RealmModel> getRealmsWithProviderTypeStream(Class<?> type) {
         DefaultModelCriteria<RealmModel> mcb = criteria();
@@ -307,6 +319,12 @@ public class MapRealmProvider implements RealmProvider {
 
     @Override
     @Deprecated
+    public Stream<String> getClientScopeIdsStream(RealmModel realm) {
+        return session.clientScopes().getClientScopeIdsStream(realm);
+    }
+
+    @Override
+    @Deprecated
     public Stream<ClientScopeModel> getClientScopesStream(RealmModel realm) {
         return session.clientScopes().getClientScopesStream(realm);
     }
@@ -461,6 +479,11 @@ public class MapRealmProvider implements RealmProvider {
     }
 
     @Override
+    public Stream<RoleModel> getClientsRolesStream(Stream<ClientModel> clients) {
+        return session.roles().getClientsRolesStream(clients);
+    }
+
+    @Override
     @Deprecated
     public void removeRoles(ClientModel client) {
         session.roles().removeRoles(client);
@@ -474,13 +497,13 @@ public class MapRealmProvider implements RealmProvider {
     
     @Override
     @Deprecated
-    public Stream<RoleModel> getRolesByIds(RealmModel realm, Stream<String> ids) {
-        return session.roles().getRolesByIds(realm, ids);
+    public Stream<RoleModel> getRolesByIds(Set<RealmModel> realms, Stream<String> ids) {
+        return session.roles().getRolesByIds(realms, ids);
     }
 
     @Override
-    public Stream<RoleModel> getCompositeRolesByIds(RealmModel realm, Stream<CompositeRoleIdentifiersModel> compositeRoleIds) {
-        return session.roles().getCompositeRolesByIds(realm, compositeRoleIds);
+    public Stream<RoleModel> getCompositeRolesByIds(Set<RealmModel> realms, Stream<CompositeRoleIdentifiersModel> compositeRoleIds) {
+        return session.roles().getCompositeRolesByIds(realms, compositeRoleIds);
     }
 
     @Override

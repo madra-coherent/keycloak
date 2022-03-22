@@ -65,8 +65,8 @@ public class AuthenticationFlowEntity {
     @Column(name="BUILT_IN")
     protected boolean builtIn;
 
-
-    @OneToMany(fetch = FetchType.LAZY, cascade ={CascadeType.REMOVE}, orphanRemoval = true, mappedBy = "parentFlow")
+    @OneToMany(fetch = FetchType.LAZY, cascade ={CascadeType.REMOVE, CascadeType.DETACH}, orphanRemoval = true, mappedBy = "parentFlow")
+    //@OneToMany(fetch = FetchType.LAZY, cascade ={CascadeType.REMOVE}, orphanRemoval = true, mappedBy = "parentFlow")
     Collection<AuthenticationExecutionEntity> executions;
     public String getId() {
         return id;

@@ -1049,6 +1049,11 @@ public class RealmAdapter implements CachedRealmModel {
     }
 
     @Override
+    public String getMasterAdminClientId() {
+        return cached.getMasterAdminClient();
+    }
+    
+    @Override
     public void setMasterAdminClient(ClientModel client) {
         getDelegateForUpdate();
         updated.setMasterAdminClient(client);
@@ -1063,6 +1068,11 @@ public class RealmAdapter implements CachedRealmModel {
     @Override
     public RoleModel getDefaultRole() {
         return cached.getDefaultRoleId() == null ? null : cacheSession.getRoleById(this, cached.getDefaultRoleId());
+    }
+
+    @Override
+    public String getDefaultRoleId() {
+        return cached.getDefaultRoleId();
     }
 
     @Override
@@ -1493,6 +1503,12 @@ public class RealmAdapter implements CachedRealmModel {
     }
 
     @Override
+    public Stream<String> getClientScopeIdsStream() {
+        if (isUpdated()) return updated.getClientScopeIdsStream();
+        return cached.getClientScopes().stream();
+    }
+
+    @Override
     public Stream<ClientScopeModel> getClientScopesStream() {
         if (isUpdated()) return updated.getClientScopesStream();
         return cached.getClientScopes().stream().map(scope -> {
@@ -1543,6 +1559,12 @@ public class RealmAdapter implements CachedRealmModel {
     public void removeDefaultClientScope(ClientScopeModel clientScope) {
         getDelegateForUpdate();
         updated.removeDefaultClientScope(clientScope);
+    }
+
+    @Override
+    public Stream<String> getDefaultClientScopeIdsStream() {
+        if (isUpdated()) return updated.getDefaultClientScopeIdsStream();
+        return cached.getDefaultDefaultClientScopes().stream();
     }
 
     @Override
@@ -1766,4 +1788,5 @@ public class RealmAdapter implements CachedRealmModel {
     public String toString() {
         return String.format("%s@%08x", getId(), hashCode());
     }
+    
 }

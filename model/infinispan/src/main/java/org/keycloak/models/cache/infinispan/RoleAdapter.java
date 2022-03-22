@@ -110,6 +110,12 @@ public class RoleAdapter implements RoleModel {
     }
 
     @Override
+    public String getRealmId() {
+        if (isUpdated()) return updated.getRealmId();
+        return cached.getRealm();
+    }
+
+    @Override
     public boolean isComposite() {
         if (isUpdated()) return updated.isComposite();
         return cached.isComposite();

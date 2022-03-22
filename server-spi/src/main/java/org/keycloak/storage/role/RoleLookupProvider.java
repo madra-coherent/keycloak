@@ -16,6 +16,10 @@
  */
 package org.keycloak.storage.role;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.stream.Stream;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.CompositeRoleIdentifiersModel;
@@ -44,24 +48,34 @@ public interface RoleLookupProvider {
     RoleModel getRoleById(RealmModel realm, String id);
 
     /**
-     * Exact search for multiple roles by their internal ID.
+     * Exact search for multiple roles by their internal ID within the specified realm.
      * Important: no ordering is specified, so sorting must performed onto the result if appropriate 
-     * @param realm Realm.
+     * @param realm the {@link RealmModel} to restrict the roles to
      * @param ids the Internal IDs of the roles.
-     * @return Stream of {@link RoleModel}.
+     * @return Stream of {@link RoleModel}. Never null.
      */
-    Stream<RoleModel> getRolesByIds(RealmModel realm, Stream<String> ids);
+    default Stream<RoleModel> getRolesByIds(RealmModel realm, Stream<String> ids) {
+        return realm == null ? Stream.empty() : getRolesByIds(Collections.singleton(realm), ids);
+    }
+
+    /**
+     * Exact search for multiple roles by their internal ID within a specified set of realms.
+     * Important: no ordering is specified, so sorting must performed onto the result if appropriate 
+     * @param realms the {@link RealmModel}s to restrict the roles to
+     * @param ids the Internal IDs of the roles.
+     * @return Stream of {@link RoleModel}. Never null.
+     */
+    Stream<RoleModel> getRolesByIds(Set<RealmModel> realms, Stream<String> ids);
 
     /**
      * Specialized exact search for multiple roles by their internal ID, with already known composite child ids
      * (which saves loading them from the provider again).
-     * discarding the known composite child IDs entirely.
      * Important: no ordering is specified, so sorting must performed onto the result if appropriate 
      * @param realm Realm.
      * @param compositeRoleIds the stream of roles identifiers, containing both their own ID and their child role IDs.
      * @return Stream of {@link RoleModel}.
      */
-    Stream<RoleModel> getCompositeRolesByIds(RealmModel realm, Stream<CompositeRoleIdentifiersModel> compositeRoleIds);
+    Stream<RoleModel> getCompositeRolesByIds(Set<RealmModel> realms, Stream<CompositeRoleIdentifiersModel> compositeRoleIds);
 
     /**
      * Resolves the specified role IDs with the entire set of children role IDs (expanding composites),

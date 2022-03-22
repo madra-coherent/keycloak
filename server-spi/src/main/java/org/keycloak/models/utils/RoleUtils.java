@@ -17,13 +17,11 @@
 
 package org.keycloak.models.utils;
 
-import org.jboss.logging.Logger;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.GroupModel;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.RoleContainerModel;
 import org.keycloak.models.RoleModel;
-import org.keycloak.models.UserModel;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -225,30 +223,6 @@ public class RoleUtils {
         return roles.flatMap(roleModel -> RoleUtils.expandCompositeRolesStream(roleModel, visited));
     }
 
-    private static final Logger logger = Logger.getLogger(RoleUtils.class);
-    
-    /**
-     * @param user
-     * @return all user role mappings including all groups of user. Composite roles will be expanded
-     */
-    public static Set<RoleModel> getDeepUserRoleMappings(UserModel user) {
-        Set<RoleModel> result = user.getDeepRoleMappingsStream().collect(Collectors.toSet());
-        logger.infof("Found %d items for user %s", result.size(), user.getUsername());
-        return result;
-//        Set<RoleModel> roleMappings = user.getRoleMappingsStream().collect(Collectors.toSet());
-//        user.getGroupsStream().forEach(group -> addGroupRoles(group, roleMappings));
-//        Set<RoleModel> result = expandCompositeRoles(roleMappings);
-//        logger.infof("Found %d items for user %s", result.size(), user.getUsername());
-//        return result;
-    }
-
-
-    private static void addGroupRoles(GroupModel group, Set<RoleModel> roleMappings) {
-        roleMappings.addAll(group.getRoleMappingsStream().collect(Collectors.toSet()));
-        if (group.getParentId() == null) return;
-        addGroupRoles(group.getParent(), roleMappings);
-    }
-    
     /**
      * Collects all the roles attached to the specified groups and their ascendants
      * @param groups the groups to collect role IDs for 

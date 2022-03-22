@@ -57,6 +57,8 @@ public interface RoleModel {
     void addCompositeRole(RoleModel role);
 
     void removeCompositeRole(RoleModel role);
+    
+    String getRealmId();
 
     /**
      * @deprecated Use {@link #getCompositesStream() getCompositesStream} instead.
@@ -118,4 +120,6 @@ public interface RoleModel {
     Stream<String> getAttributeStream(String name);
 
     Map<String, List<String>> getAttributes();
+    
+    default void release() {}
 }

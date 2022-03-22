@@ -59,12 +59,14 @@ import org.keycloak.models.Constants;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.RequiredActionProviderModel;
+import org.keycloak.models.RoleModel;
 import org.keycloak.models.UserConsentModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.models.UserSessionModel;
 import org.keycloak.models.utils.KeycloakModelUtils;
 import org.keycloak.models.utils.SessionTimeoutHelper;
 import org.keycloak.models.utils.SystemClientUtil;
+import org.keycloak.models.utils.UserModelDelegate;
 import org.keycloak.protocol.LoginProtocol;
 import org.keycloak.protocol.LoginProtocol.Error;
 import org.keycloak.protocol.oidc.BackchannelLogoutResponse;
@@ -1519,7 +1521,7 @@ public class AuthenticationManager {
         private final ClientModel client;
 
         public AuthResult(UserModel user, UserSessionModel session, AccessToken token, ClientModel client) {
-            this.user = user;
+            this.user = new EphemeralRoleCachingUserModel(user);
             this.session = session;
             this.token = token;
             this.client = client;
@@ -1540,6 +1542,37 @@ public class AuthenticationManager {
         public ClientModel getClient() {
             return client;
         }
+    }
+    
+    /**
+     * An ephemeral caching wrapper of a {@link UserModel} which aims at computing the
+     * user's expanded roles only once during the scope of an authenticated operation.
+     * This is complementary to the model caching layer, which caches information across
+     * operations - here, we want the role expansion to happen each time a new operation is
+     * performed so that any change in the roles are taken into account.
+     * 
+     * This implementation is NOT thread-safe.
+     */
+    public static class EphemeralRoleCachingUserModel extends UserModelDelegate {
+
+        private Set<String> expandedRoleIds = null;
+        
+        public EphemeralRoleCachingUserModel(UserModel delegate) {
+            super(delegate);
+        }
+        
+        protected Set<String> getExpandedRoleIds() {
+            if (expandedRoleIds == null) {
+                expandedRoleIds = delegate.getDeepRoleMappingsStream().map(RoleModel::getId).collect(Collectors.toSet());
+            }
+            return expandedRoleIds;
+        }
+
+        @Override
+        public boolean hasRole(RoleModel role) {
+            return getExpandedRoleIds().contains(role.getId());
+        }
+
     }
 
     public static void setKcActionStatus(String executedProviderId, RequiredActionContext.KcActionStatus status, AuthenticationSessionModel authSession) {

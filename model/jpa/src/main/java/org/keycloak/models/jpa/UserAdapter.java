@@ -42,6 +42,7 @@ import javax.persistence.criteria.CriteriaQuery;
 import javax.persistence.criteria.Predicate;
 import javax.persistence.criteria.Root;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -494,7 +495,7 @@ public class UserAdapter implements UserModel.Streams, JpaModel<UserEntity> {
         roleIds.addAll(getRoleMappingIdsStream().collect(Collectors.toList()));
         roleIds.addAll(RoleUtils.collectGroupRoleMappingIds(getGroupsStream()));
         Stream<CompositeRoleIdentifiersModel> expandedRoleIds = session.roles().getDeepCompositeRoleIdsStream(realm, roleIds.stream());
-        return session.roles().getCompositeRolesByIds(realm, expandedRoleIds);
+        return session.roles().getCompositeRolesByIds(Collections.singleton(realm), expandedRoleIds);
     }
 
     @Override

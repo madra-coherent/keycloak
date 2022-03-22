@@ -34,6 +34,7 @@ import javax.persistence.LockModeType;
 import javax.persistence.TypedQuery;
 import java.util.*;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Objects.nonNull;
@@ -1175,6 +1176,11 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
     }
 
     @Override
+    public String getMasterAdminClientId() {
+        return realm.getMasterAdminClient();
+    }
+    
+    @Override
     public void setMasterAdminClient(ClientModel client) {
         String appEntityId = client !=null ? em.getReference(ClientEntity.class, client.getId()).getId() : null;
         realm.setMasterAdminClient(appEntityId);
@@ -1192,6 +1198,11 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
             return null;
         }
         return session.roles().getRoleById(this, realm.getDefaultRoleId());
+    }
+    
+    @Override
+    public String getDefaultRoleId() {
+       return realm.getDefaultRoleId(); 
     }
 
     @Override
@@ -1581,7 +1592,10 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
     public AuthenticationFlowModel getAuthenticationFlowById(String id) {
         AuthenticationFlowEntity entity = getAuthenticationFlowEntity(id, false);
         if (entity == null) return null;
-        return entityToModel(entity);
+        AuthenticationFlowModel model = entityToModel(entity);
+        em.flush();
+        em.detach(entity);
+        return model;
     }
 
     @Override
@@ -1612,7 +1626,11 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
                 ? em.find(AuthenticationFlowEntity.class, id, LockModeType.PESSIMISTIC_WRITE)
                 : em.find(AuthenticationFlowEntity.class, id);
         if (entity == null) return null;
-        if (!entity.getRealm().equals(getEntity())) return null;
+        if (!entity.getRealm().equals(getEntity())) {
+            em.flush();
+            em.detach(entity);
+            return null;
+        }
         return entity;
     }
 
@@ -1637,10 +1655,15 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
     public Stream<AuthenticationExecutionModel> getAuthenticationExecutionsStream(String flowId) {
         AuthenticationFlowEntity flow = em.getReference(AuthenticationFlowEntity.class, flowId);
 
-        return flow.getExecutions().stream()
+        //HibernateSessionUtils.inspect(em);
+        List<AuthenticationExecutionModel> result = flow.getExecutions().stream()
                 .filter(e -> getId().equals(e.getRealm().getId()))
                 .map(this::entityToModel)
-                .sorted(AuthenticationExecutionModel.ExecutionComparator.SINGLETON);
+                .sorted(AuthenticationExecutionModel.ExecutionComparator.SINGLETON)
+                .collect(Collectors.toList());
+        em.flush();
+        em.detach(flow);
+        return result.stream();
     }
 
     public AuthenticationExecutionModel entityToModel(AuthenticationExecutionEntity entity) {
@@ -1653,6 +1676,8 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
         model.setParentFlow(entity.getParentFlow().getId());
         model.setAuthenticatorFlow(entity.isAutheticatorFlow());
         model.setAuthenticatorConfig(entity.getAuthenticatorConfig());
+//        em.flush();
+//        em.detach(entity);
         return model;
     }
 
@@ -1660,7 +1685,10 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
     public AuthenticationExecutionModel getAuthenticationExecutionById(String id) {
         AuthenticationExecutionEntity entity = getAuthenticationExecution(id, false);
         if (entity == null) return null;
-        return entityToModel(entity);
+        AuthenticationExecutionModel model = entityToModel(entity);
+        em.flush();
+        em.detach(entity);
+        return model;
     }
 
     public AuthenticationExecutionModel getAuthenticationExecutionByFlowId(String flowId) {
@@ -1670,7 +1698,10 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
             return null;
         }
         AuthenticationExecutionEntity authenticationFlowExecution = query.getResultList().get(0);
-        return entityToModel(authenticationFlowExecution);
+        AuthenticationExecutionModel model = entityToModel(authenticationFlowExecution); 
+        em.flush();
+        em.detach(authenticationFlowExecution);
+        return model;
     }
 
     @Override
@@ -1948,6 +1979,11 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
     }
 
     @Override
+    public Stream<String> getClientScopeIdsStream() {
+        return session.clientScopes().getClientScopeIdsStream(this);
+    }
+
+    @Override
     public Stream<ClientScopeModel> getClientScopesStream() {
         return session.clientScopes().getClientScopesStream(this);
     }
@@ -1993,11 +2029,16 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
     }
 
     @Override
-    public Stream<ClientScopeModel> getDefaultClientScopesStream(boolean defaultScope) {
+    public Stream<String> getDefaultClientScopeIdsStream() {
         TypedQuery<String> query = em.createNamedQuery("defaultClientScopeRealmMappingIdsByRealm", String.class);
         query.setParameter("realm", getEntity());
-        query.setParameter("defaultScope", defaultScope);
-        return closing(query.getResultStream().map(this::getClientScopeById).filter(Objects::nonNull));
+        query.setParameter("defaultScope", true);
+        return closing(query.getResultStream());
+    }
+    
+    @Override
+    public Stream<ClientScopeModel> getDefaultClientScopesStream(boolean defaultScope) {
+        return getDefaultClientScopeIdsStream().map(this::getClientScopeById).filter(Objects::nonNull);
     }
 
     @Override
@@ -2293,4 +2334,11 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
     public String toString() {
         return String.format("%s@%08x", getId(), hashCode());
     }
+
+    @Override
+    public void release() {
+        em.flush();
+        em.detach(realm);
+    }
+    
 }

@@ -59,13 +59,20 @@ import javax.ws.rs.ext.Providers;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * @author <a href="mailto:bill@burkecentral.com">Bill Burke</a>
@@ -227,17 +234,17 @@ public class AdminConsole {
         }
 
         RealmModel masterRealm = getAdminstrationRealm(realmManager);
-        Map<String, Set<String>> realmAccess = new HashMap<String, Set<String>>();
+        Map<String, Set<String>> realmAccess;
         if (masterRealm == null)
             throw new NotFoundException("No realm found");
         boolean createRealm = false;
         if (realm.equals(masterRealm)) {
             logger.debug("setting up realm access for a master realm user");
             createRealm = user.hasRole(masterRealm.getRole(AdminRoles.CREATE_REALM));
-            addMasterRealmAccess(user, realmAccess);
+            realmAccess = getMasterRealmAccess(user);
         } else {
             logger.debug("setting up realm access for a realm user");
-            addRealmAccess(realm, user, realmAccess);
+            realmAccess = getRealmAccess(realm, user); 
         }
 
         Locale locale = session.getContext().resolveLocale(user);
@@ -248,42 +255,50 @@ public class AdminConsole {
         return Response.ok(new WhoAmI(user.getId(), realm.getName(), displayName, createRealm, realmAccess, locale)).build();
     }
 
-    private void addRealmAccess(RealmModel realm, UserModel user, Map<String, Set<String>> realmAdminAccess) {
-        RealmManager realmManager = new RealmManager(session);
-        ClientModel realmAdminApp = realm.getClientByClientId(realmManager.getRealmAdminClientId(realm));
-        getRealmAdminAccess(realm, realmAdminApp, user, realmAdminAccess);
-    }
+    /**
+     * Builds the user's admin roles collection for the specified realm  
+     * @param realms the realm to get the user's admin roles for
+     * @param user the user to get roles for
+     * @param realmAdminClientSupplier the function to apply to retrieve the admin client for a realm
+     * @return the map of <realm name, set of role names)
+     */
+    private Map<String, Set<String>> getPerRealmAccess(Stream<RealmModel> realms, UserModel user, Function<RealmModel,ClientModel> realmAdminClientSupplier) {
+        logger.infof("Collecting realms");
+        Collection<RealmModel> collectedRealms = realms.collect(Collectors.toList());
+        
+        logger.infof("Collecting clients for %d realms", collectedRealms.size());
 
-    private void addMasterRealmAccess(UserModel user, Map<String, Set<String>> realmAdminAccess) {
-        session.realms().getRealmsStream().forEach(realm -> {
-            ClientModel realmAdminApp = realm.getMasterAdminClient();
-            getRealmAdminAccess(realm, realmAdminApp, user, realmAdminAccess);
+        // Cannot rely of the roles' realmid as all realm admin roles are detained by the master realm
+        // Maintains the mapping between the client id and the realm it's related to
+        Map<String, RealmModel> realmsByAdminClientId =  new HashMap<>();
+        Set<ClientModel> realmAdminClients = new HashSet<>();
+        collectedRealms.forEach(realm -> {
+            ClientModel client = realmAdminClientSupplier.apply(realm);
+            if (client != null) {
+                realmAdminClients.add(client);
+                realmsByAdminClientId.put(client.getId(), realm);
+            }
         });
+        
+        logger.infof("Collecting user admin roles for %d clients", realmAdminClients.size());
+        Map<String, Set<String>> result = session.roles().getClientsRolesStream(realmAdminClients.stream())
+                .filter(user::hasRole)
+                .collect(Collectors.groupingBy(
+                        role -> realmsByAdminClientId.get(role.getContainerId()).getName(),
+                        Collectors.mapping(RoleModel::getName, Collectors.toSet())
+                        ));
+        logger.infof("Collected %d user admin roles", result.values().size());
+        
+        return result;
+    }
+    
+    private Map<String, Set<String>> getRealmAccess(RealmModel realm, UserModel user) {
+        RealmManager realmManager = new RealmManager(session);
+        return getPerRealmAccess(Stream.of(realm), user, r -> r.getClientByClientId(realmManager.getRealmAdminClientId(r)));
     }
 
-    private static <T> HashSet<T> union(Set<T> set1, Set<T> set2) {
-        if (set1 == null && set2 == null) {
-            return null;
-        }
-        HashSet<T> res;
-        if (set1 instanceof HashSet) {
-            res = (HashSet <T>) set1;
-        } else {
-            res = set1 == null ? new HashSet<>() : new HashSet<>(set1);
-        }
-        if (set2 != null) {
-            res.addAll(set2);
-        }
-        return res;
-    }
-
-    private void getRealmAdminAccess(RealmModel realm, ClientModel client, UserModel user, Map<String, Set<String>> realmAdminAccess) {
-        Set<String> realmRoles = client.getRolesStream()
-          .filter(user::hasRole)
-          .map(RoleModel::getName)
-          .collect(Collectors.toSet());
-
-        realmAdminAccess.merge(realm.getName(), realmRoles, AdminConsole::union);
+    private Map<String, Set<String>> getMasterRealmAccess(UserModel user) {
+        return getPerRealmAccess(session.realms().getRealmsStream(), user, RealmModel::getMasterAdminClient);
     }
 
     /**

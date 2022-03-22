@@ -97,6 +97,7 @@ public class RealmsAdminResource {
     @Produces(MediaType.APPLICATION_JSON)
     public Stream<RealmRepresentation> getRealms(@DefaultValue("false") @QueryParam("briefRepresentation") boolean briefRepresentation) {
         Stream<RealmRepresentation> realms = session.realms().getRealmsStream()
+                .sorted((r1, r2) -> r1.getName().compareTo(r2.getName()))
                 .map(realm -> toRealmRep(realm, briefRepresentation))
                 .filter(Objects::nonNull);
         return throwIfEmpty(realms, new ForbiddenException());

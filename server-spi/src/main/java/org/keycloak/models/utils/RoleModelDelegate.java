@@ -57,6 +57,11 @@ public class RoleModelDelegate implements RoleModel {
     public RoleContainerModel getContainer() {
         return delegate.getContainer();
     }
+    
+    @Override
+    public String getRealmId() {
+        return delegate.getRealmId();
+    }
 
     @Override
     public boolean isComposite() {
@@ -117,5 +122,24 @@ public class RoleModelDelegate implements RoleModel {
     public void removeAttribute(String name) {
         delegate.removeAttribute(name);
     }
-    
+
+    @Override
+    public void release() {
+        delegate.release();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || !(o instanceof RoleModel)) return false;
+
+        RoleModel that = (RoleModel) o;
+        return that.getId().equals(getId());
+    }
+
+    @Override
+    public int hashCode() {
+        return getId().hashCode();
+    }
+
 }

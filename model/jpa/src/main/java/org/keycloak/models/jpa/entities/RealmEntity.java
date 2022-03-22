@@ -49,6 +49,7 @@ import java.util.Set;
 @Entity
 @NamedQueries({
         @NamedQuery(name="getAllRealmIds", query="select realm.id from RealmEntity realm"),
+        @NamedQuery(name="getRealmsByIds", query="select realm from RealmEntity realm where realm.id in :ids"),
         @NamedQuery(name="getRealmIdByName", query="select realm.id from RealmEntity realm where realm.name = :name"),
         @NamedQuery(name="getRealmIdsWithProviderType", query="select distinct c.realm.id from ComponentEntity c where c.providerType = :providerType"),
 })
@@ -136,16 +137,20 @@ public class RealmEntity {
     @Column(name="EMAIL_THEME")
     protected String emailTheme;
 
-    @OneToMany(cascade ={CascadeType.REMOVE}, orphanRemoval = true, mappedBy = "realm", fetch = FetchType.EAGER)
+    @OneToMany(cascade ={CascadeType.REMOVE, CascadeType.DETACH}, orphanRemoval = true, mappedBy = "realm", fetch = FetchType.EAGER)
+    //@OneToMany(cascade ={CascadeType.REMOVE}, orphanRemoval = true, mappedBy = "realm", fetch = FetchType.EAGER)
     Collection<RealmAttributeEntity> attributes;
 
-    @OneToMany(cascade ={CascadeType.REMOVE}, orphanRemoval = true, mappedBy = "realm")
+    @OneToMany(cascade ={CascadeType.REMOVE, CascadeType.DETACH}, orphanRemoval = true, mappedBy = "realm")
+    //@OneToMany(cascade ={CascadeType.REMOVE}, orphanRemoval = true, mappedBy = "realm")
     Collection<RequiredCredentialEntity> requiredCredentials;
 
-    @OneToMany(cascade ={CascadeType.REMOVE}, orphanRemoval = true, mappedBy = "realm")
+    @OneToMany(cascade ={CascadeType.REMOVE, CascadeType.DETACH}, orphanRemoval = true, mappedBy = "realm")
+    //@OneToMany(cascade ={CascadeType.REMOVE}, orphanRemoval = true, mappedBy = "realm")
     List<UserFederationProviderEntity> userFederationProviders;
 
-    @OneToMany(cascade ={CascadeType.REMOVE}, orphanRemoval = true, mappedBy = "realm")
+    @OneToMany(cascade ={CascadeType.REMOVE, CascadeType.DETACH}, orphanRemoval = true, mappedBy = "realm")
+    //@OneToMany(cascade ={CascadeType.REMOVE}, orphanRemoval = true, mappedBy = "realm")
     Collection<UserFederationMapperEntity> userFederationMappers;
 
     @ElementCollection
@@ -186,19 +191,24 @@ public class RealmEntity {
     @Column(name="DEFAULT_ROLE")
     protected String defaultRoleId;
 
-    @OneToMany(cascade ={CascadeType.REMOVE}, orphanRemoval = true, mappedBy = "realm")
+    @OneToMany(cascade ={CascadeType.REMOVE, CascadeType.DETACH}, orphanRemoval = true, mappedBy = "realm")
+    //@OneToMany(cascade ={CascadeType.REMOVE}, orphanRemoval = true, mappedBy = "realm")
     protected List<IdentityProviderEntity> identityProviders;
 
-    @OneToMany(cascade ={CascadeType.REMOVE}, orphanRemoval = true, mappedBy = "realm")
+    @OneToMany(cascade ={CascadeType.REMOVE, CascadeType.DETACH}, orphanRemoval = true, mappedBy = "realm")
+    //@OneToMany(cascade ={CascadeType.REMOVE}, orphanRemoval = true, mappedBy = "realm")
     Collection<IdentityProviderMapperEntity> identityProviderMappers;
 
-    @OneToMany(cascade ={CascadeType.REMOVE}, orphanRemoval = true, mappedBy = "realm")
+    @OneToMany(cascade ={CascadeType.REMOVE, CascadeType.DETACH}, orphanRemoval = true, mappedBy = "realm")
+    //@OneToMany(cascade ={CascadeType.REMOVE}, orphanRemoval = true, mappedBy = "realm")
     Collection<AuthenticatorConfigEntity> authenticators;
 
-    @OneToMany(cascade ={CascadeType.REMOVE}, orphanRemoval = true, mappedBy = "realm")
+    @OneToMany(cascade ={CascadeType.REMOVE, CascadeType.DETACH}, orphanRemoval = true, mappedBy = "realm")
+    //@OneToMany(cascade ={CascadeType.REMOVE}, orphanRemoval = true, mappedBy = "realm")
     Collection<RequiredActionProviderEntity> requiredActionProviders;
 
-    @OneToMany(cascade ={CascadeType.REMOVE}, orphanRemoval = true, mappedBy = "realm")
+    @OneToMany(cascade ={CascadeType.REMOVE, CascadeType.DETACH}, orphanRemoval = true, mappedBy = "realm")
+    //@OneToMany(cascade ={CascadeType.REMOVE}, orphanRemoval = true, mappedBy = "realm")
     Collection<AuthenticationFlowEntity> authenticationFlows;
 
     @OneToMany(fetch = FetchType.LAZY, cascade ={CascadeType.ALL}, orphanRemoval = true, mappedBy = "realm")

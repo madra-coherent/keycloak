@@ -26,6 +26,7 @@ import javax.persistence.CollectionTable;
 import javax.persistence.Column;
 import javax.persistence.ElementCollection;
 import javax.persistence.Entity;
+import javax.persistence.FetchType;
 import javax.persistence.Id;
 import javax.persistence.JoinColumn;
 import javax.persistence.MapKeyColumn;
@@ -106,7 +107,8 @@ public class ClientEntity {
     @CollectionTable(name = "REDIRECT_URIS", joinColumns={ @JoinColumn(name="CLIENT_ID") })
     protected Set<String> redirectUris;
 
-    @OneToMany(cascade ={CascadeType.REMOVE}, orphanRemoval = true, mappedBy = "client")
+    @OneToMany(cascade ={CascadeType.REMOVE, CascadeType.DETACH}, orphanRemoval = true, mappedBy = "client")
+    //@OneToMany(cascade ={CascadeType.REMOVE}, orphanRemoval = true, mappedBy = "client")
     protected Collection<ClientAttributeEntity> attributes;
 
     @ElementCollection
@@ -115,7 +117,8 @@ public class ClientEntity {
     @CollectionTable(name="CLIENT_AUTH_FLOW_BINDINGS", joinColumns={ @JoinColumn(name="CLIENT_ID") })
     protected Map<String, String> authFlowBindings;
 
-    @OneToMany(cascade ={CascadeType.REMOVE}, orphanRemoval = true, mappedBy = "client")
+    @OneToMany(cascade ={CascadeType.REMOVE, CascadeType.DETACH}, orphanRemoval = true, mappedBy = "client")
+    //@OneToMany(cascade ={CascadeType.REMOVE}, orphanRemoval = true, mappedBy = "client")
     Collection<ProtocolMapperEntity> protocolMappers;
 
     @Column(name="SURROGATE_AUTH_REQUIRED")

@@ -1161,6 +1161,11 @@ public class MapRealmAdapter extends AbstractRealmModel<MapRealmEntity> implemen
     }
 
     @Override
+    public String getMasterAdminClientId() {
+        return entity.getMasterAdminClient();
+    }
+    
+    @Override
     public void setMasterAdminClient(ClientModel client) {
         String id = client == null ? null : client.getId();
         entity.setMasterAdminClient(id);
@@ -1169,6 +1174,11 @@ public class MapRealmAdapter extends AbstractRealmModel<MapRealmEntity> implemen
     @Override
     public RoleModel getDefaultRole() {
         return session.roles().getRoleById(this, entity.getDefaultRoleId());
+    }
+
+    @Override
+    public String getDefaultRoleId() {
+        return entity.getDefaultRoleId();
     }
 
     @Override
@@ -1262,6 +1272,11 @@ public class MapRealmAdapter extends AbstractRealmModel<MapRealmEntity> implemen
     }
 
     @Override
+    public Stream<String> getClientScopeIdsStream() {
+        return session.clientScopes().getClientScopeIdsStream(this);
+    }
+
+    @Override
     public Stream<ClientScopeModel> getClientScopesStream() {
         return session.clientScopes().getClientScopesStream(this);
     }
@@ -1298,6 +1313,11 @@ public class MapRealmAdapter extends AbstractRealmModel<MapRealmEntity> implemen
     @Override
     public void removeDefaultClientScope(ClientScopeModel clientScope) {
         entity.removeDefaultOrOptionalClientScope(clientScope.getId());
+    }
+
+    @Override
+    public Stream<String> getDefaultClientScopeIdsStream() {
+        return entity.getDefaultClientScopeIds();
     }
 
     @Override

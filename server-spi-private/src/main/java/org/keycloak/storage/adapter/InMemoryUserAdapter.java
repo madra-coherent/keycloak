@@ -30,6 +30,8 @@ import org.keycloak.models.utils.KeycloakModelUtils;
 import org.keycloak.models.utils.RoleUtils;
 import org.keycloak.storage.ReadOnlyException;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -299,7 +301,7 @@ public class InMemoryUserAdapter extends UserModelDefaultMethods.Streams {
         collectedRoleIds.addAll(roleIds);
         collectedRoleIds.addAll(RoleUtils.collectGroupRoleMappingIds(getGroupsStream()));
         Stream<CompositeRoleIdentifiersModel> expandedRoleIds = session.roles().getDeepCompositeRoleIdsStream(realm, roleIds.stream());
-        return session.roles().getCompositeRolesByIds(realm, expandedRoleIds);
+        return session.roles().getCompositeRolesByIds(Collections.singleton(realm), expandedRoleIds);
     }
 
     @Override

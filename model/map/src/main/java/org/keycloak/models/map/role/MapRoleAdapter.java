@@ -21,10 +21,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.jboss.logging.Logger;
 import static org.keycloak.common.util.StackUtil.getShortStackTrace;
@@ -65,6 +62,11 @@ public class MapRoleAdapter extends AbstractRoleModel<MapRoleEntity> implements 
     @Override
     public void setName(String name) {
         entity.setName(name);
+    }
+    
+    @Override
+    public String getRealmId() {
+        return entity.getRealmId();
     }
 
     @Override

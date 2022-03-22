@@ -51,6 +51,11 @@ public class ClientScopeStorageManager extends AbstractStorageManager<ClientScop
     /* CLIENT SCOPE PROVIDER METHODS - provided only by local storage (e.g. not supported by storage providers) */
 
     @Override
+    public Stream<String> getClientScopeIdsStream(RealmModel realm) {
+        return session.clientScopeLocalStorage().getClientScopeIdsStream(realm);
+    }
+
+    @Override
     public Stream<ClientScopeModel> getClientScopesStream(RealmModel realm) {
         return session.clientScopeLocalStorage().getClientScopesStream(realm);
     }

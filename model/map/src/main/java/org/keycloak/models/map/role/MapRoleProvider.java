@@ -33,6 +33,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -65,6 +66,11 @@ public class MapRoleProvider implements RoleProvider {
     private Function<MapRoleEntity, RoleModel> entityToAdapterFunc(RealmModel realm) {
         // Clone entity before returning back, to avoid giving away a reference to the live object to the caller
         return origEntity -> new MapRoleAdapter(session, realm, origEntity);
+    }
+
+    private Function<MapRoleEntity, Optional<RoleModel>> entityToAdapterFunc(Map<String, RealmModel> realmsById) {
+        return origEntity -> Optional.ofNullable(realmsById.get(origEntity.getRealmId()))
+                .map(realm -> new MapRoleAdapter(session, realm, origEntity));
     }
 
     @Override
@@ -200,6 +206,22 @@ public class MapRoleProvider implements RoleProvider {
         return tx.read(withCriteria(mcb).orderBy(SearchableFields.NAME, ASCENDING))
                 .map(entityToAdapterFunc(client.getRealm()));
     }
+    
+    @Override
+    public Stream<RoleModel> getClientsRolesStream(Stream<ClientModel> clients) {
+        Map<String, RealmModel> realmsByClientId = clients.collect(Collectors.toMap(ClientModel::getId, ClientModel::getRealm));
+        Map<String, RealmModel> realmsById = realmsByClientId.values().stream().collect(Collectors.toMap(RealmModel::getId, Function.identity()));
+
+        DefaultModelCriteria<RoleModel> mcb = criteria();
+        mcb = mcb.compare(SearchableFields.REALM_ID, Operator.IN, realmsById.keySet())
+          .compare(SearchableFields.CLIENT_ID, Operator.IN, realmsByClientId.keySet());
+
+        return tx.read(withCriteria(mcb).orderBy(SearchableFields.NAME, ASCENDING))
+                .map(entityToAdapterFunc(realmsById))
+                .filter(Optional::isPresent)
+                .map(Optional::get);
+    }
+    
     @Override
     public boolean removeRole(RoleModel role) {
         LOG.tracef("removeRole(%s(%s))%s", role.getName(), role.getId(), getShortStackTrace());
@@ -295,37 +317,45 @@ public class MapRoleProvider implements RoleProvider {
     }
     
     @Override
-    public Stream<RoleModel> getRolesByIds(RealmModel realm, Stream<String> ids) {
-        if (ids == null || realm == null || realm.getId() == null) {
+    public Stream<RoleModel> getRolesByIds(Set<RealmModel> realms, Stream<String> ids) {
+        if (ids == null || realms == null || realms.isEmpty()) {
             return Stream.empty();
         }
 
-        LOG.tracef("getRolesByIds(%s, %s)%s", realm, ids, getShortStackTrace());
+        LOG.tracef("getRolesByIds(%s, %s)%s", realms, ids, getShortStackTrace());
+
+        Map<String, RealmModel> realmsById = realms.stream().collect(Collectors.toMap(RealmModel::getId, Function.identity()));
 
         DefaultModelCriteria<RoleModel> mcb = criteria();
-        mcb = mcb.compare(SearchableFields.REALM_ID, Operator.EQ, realm.getId())
+        mcb = mcb.compare(SearchableFields.REALM_ID, Operator.IN, realmsById.keySet())
                 .compare(SearchableFields.ID, Operator.IN, ids);
 
         return tx.read(withCriteria(mcb))
-                .filter(entity -> Objects.equals(realm.getId(), entity.getRealmId()))
-                .map(entityToAdapterFunc(realm));
+                .map(entityToAdapterFunc(realmsById))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                ;
     }
 
     @Override
-    public Stream<RoleModel> getCompositeRolesByIds(RealmModel realm, Stream<CompositeRoleIdentifiersModel> compositeRoleIds) {
-        if (compositeRoleIds == null || realm == null || realm.getId() == null) {
+    public Stream<RoleModel> getCompositeRolesByIds(Set<RealmModel> realms, Stream<CompositeRoleIdentifiersModel> compositeRoleIds) {
+        if (compositeRoleIds == null || realms == null || realms.isEmpty()) {
             return Stream.empty();
         }
 
-        LOG.tracef("getCompositeRolesByIds(%s, %s)%s", realm, compositeRoleIds, getShortStackTrace());
+        LOG.tracef("getCompositeRolesByIds(%s, %s)%s", realms, compositeRoleIds, getShortStackTrace());
+        
+        Map<String, RealmModel> realmsById = realms.stream().collect(Collectors.toMap(RealmModel::getId, Function.identity()));
 
         DefaultModelCriteria<RoleModel> mcb = criteria();
-        mcb = mcb.compare(SearchableFields.REALM_ID, Operator.EQ, realm.getId())
+        mcb = mcb.compare(SearchableFields.REALM_ID, Operator.IN, realmsById.keySet())
                 .compare(SearchableFields.ID, Operator.IN, compositeRoleIds.map(CompositeRoleIdentifiersModel::getRoleId));
 
         return tx.read(withCriteria(mcb))
-                .filter(entity -> Objects.equals(realm.getId(), entity.getRealmId()))
-                .map(entityToAdapterFunc(realm));
+                .map(entityToAdapterFunc(realmsById))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                ;
     }
     
     @Override

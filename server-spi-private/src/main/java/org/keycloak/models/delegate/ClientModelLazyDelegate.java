@@ -674,4 +674,9 @@ public class ClientModelLazyDelegate implements ClientModel {
         return getDelegate().getProtocolMapperByName(protocol, name);
     }
 
+    @Override
+    public void release() {
+        getDelegate().release();
+    }
+    
 }

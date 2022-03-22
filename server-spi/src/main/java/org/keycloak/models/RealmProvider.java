@@ -61,6 +61,20 @@ public interface RealmProvider extends Provider /* TODO: Remove in future versio
     RealmModel getRealmByName(String name);
 
     /**
+     * Returns the IDs of all realms as a stream.
+     * @return Stream of {@link RealmModel} IDs. Never returns {@code null}.
+     */
+    Stream<String> getRealmIdsStream();
+
+    /**
+     * Exact search for multiple realms by their internal ID.
+     * Important: no ordering is specified, so sorting must performed onto the result if appropriate 
+     * @param ids the Internal IDs of the realms.
+     * @return Stream of {@link RealmModel}. Never null.
+     */
+    Stream<RealmModel> getRealmsByIdsStream(Stream<String> ids);
+
+    /**
      * Returns realms as a stream.
      * @return Stream of {@link RealmModel}. Never returns {@code null}.
      */

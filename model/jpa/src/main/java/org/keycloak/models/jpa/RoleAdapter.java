@@ -94,6 +94,11 @@ public class RoleAdapter implements RoleModel, JpaModel<RoleEntity> {
     }
 
     @Override
+    public String getRealmId() {
+        return role.getRealmId();
+    }
+
+    @Override
     public boolean isComposite() {
         TypedQuery<String> query = em.createNamedQuery("getChildrenRoleIds", String.class);
         query.setParameter("roleId", getId());
@@ -276,4 +281,13 @@ public class RoleAdapter implements RoleModel, JpaModel<RoleEntity> {
         }
         return em.getReference(RoleEntity.class, model.getId());
     }
+
+    @Override
+    public void release() {
+        if (getEntity()==null) return;
+        //HibernateSessionUtils.inspect(em);
+        //em.flush();
+        em.detach(getEntity());
+    }
+    
 }

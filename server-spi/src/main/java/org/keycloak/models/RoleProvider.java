@@ -146,8 +146,18 @@ public interface RoleProvider extends Provider, RoleLookupProvider {
     Stream<RoleModel> getClientRolesStream(ClientModel client, Integer first, Integer max);
 
     /**
+     * Returns the client roles of the given clients, potentially living in distinct realms.
+     * @param clientIds internal IDs of the clients to get roles for.
+     * @return Stream of the roles. Never returns {@code null}.
+     */
+    Stream<RoleModel> getClientsRolesStream(Stream<ClientModel> clients);
+
+    /**
      * Removes all roles from the given client.
      * @param client Client.
      */
     void removeRoles(ClientModel client);
+
+    default void flushChanges() {
+    }
 }

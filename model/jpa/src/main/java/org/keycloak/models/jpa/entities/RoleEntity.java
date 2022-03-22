@@ -55,6 +55,7 @@ import java.util.Set;
 @NamedQueries({
         @NamedQuery(name="getClientRoles", query="select role from RoleEntity role where role.clientId = :client order by role.name"),
         @NamedQuery(name="getClientRoleIds", query="select role.id from RoleEntity role where role.clientId = :client"),
+        @NamedQuery(name="getClientRoleIdsFromIdList", query="select role.id from RoleEntity role where role.clientId in :clientids"),
         @NamedQuery(name="getClientRoleByName", query="select role from RoleEntity role where role.name = :name and role.clientId = :client"),
         @NamedQuery(name="getClientRoleIdByName", query="select role.id from RoleEntity role where role.name = :name and role.clientId = :client"),
         @NamedQuery(name="searchForClientRoles", query="select role from RoleEntity role where role.clientId = :client and ( lower(role.name) like :search or lower(role.description) like :search ) order by role.name"),
@@ -65,7 +66,7 @@ import java.util.Set;
         @NamedQuery(name="searchForRealmRoles", query="select role from RoleEntity role where role.clientRole = false and role.realmId = :realm and ( lower(role.name) like :search or lower(role.description) like :search ) order by role.name"),
         @NamedQuery(name="getRoleIdsFromIdList", query="select role.id from RoleEntity role where role.realmId = :realm and role.id in :ids order by role.name ASC"),
         @NamedQuery(name="getRoleIdsByNameContainingFromIdList", query="select role.id from RoleEntity role where role.realmId = :realm and lower(role.name) like lower(concat('%',:search,'%')) and role.id in :ids order by role.name ASC"),
-        @NamedQuery(name="getRolesFromIdList", query="select role from RoleEntity role where role.realmId = :realm and role.id in :ids order by role.name ASC"),
+        @NamedQuery(name="getRolesFromIdList", query="select role from RoleEntity role where role.realmId in :realmids and role.id in :ids order by role.name ASC"),
 })
 
 public class RoleEntity {

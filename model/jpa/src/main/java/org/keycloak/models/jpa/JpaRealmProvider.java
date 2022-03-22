@@ -36,6 +36,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.persistence.EntityManager;
 import javax.persistence.LockModeType;
+import javax.persistence.Persistence;
 import javax.persistence.TypedQuery;
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaDelete;
@@ -44,6 +45,7 @@ import javax.persistence.criteria.Join;
 import javax.persistence.criteria.Predicate;
 import javax.persistence.criteria.Root;
 
+import org.apache.commons.lang.StringUtils;
 import org.jboss.logging.Logger;
 import org.keycloak.common.util.Time;
 import org.keycloak.connections.jpa.util.JpaUtils;
@@ -104,6 +106,10 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
         return createRealm(KeycloakModelUtils.generateId(), name);
     }
 
+    protected RealmAdapter toAdapter(RealmEntity realm) {
+        //HibernateSessionUtils.inspect(em);
+        return new RealmAdapter(session, em, realm);
+    }
     @Override
     public RealmModel createRealm(String id, String name) {
         RealmEntity realm = new RealmEntity();
@@ -111,7 +117,7 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
         realm.setId(id);
         em.persist(realm);
         em.flush();
-        final RealmModel adapter = new RealmAdapter(session, em, realm);
+        final RealmModel adapter = toAdapter(realm);
         session.getKeycloakSessionFactory().publish(new RealmModel.RealmCreationEvent() {
             @Override
             public RealmModel getCreatedRealm() {
@@ -127,12 +133,29 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
 
     @Override
     public RealmModel getRealm(String id) {
+        
+        //HibernateSessionUtils.inspect(em);
+
         RealmEntity realm = em.find(RealmEntity.class, id);
         if (realm == null) return null;
-        RealmAdapter adapter = new RealmAdapter(session, em, realm);
+        RealmAdapter adapter = toAdapter(realm);
         return adapter;
     }
 
+    @Override
+    public Stream<String> getRealmIdsStream() {
+        TypedQuery<String> query = em.createNamedQuery("getAllRealmIds", String.class);
+        return closing(query.getResultStream());
+    }
+
+    @Override
+    public Stream<RealmModel> getRealmsByIdsStream(Stream<String> ids) {
+        if (ids==null) return Stream.empty();
+        TypedQuery<RealmEntity> query = em.createNamedQuery("getRealmsByIds", RealmEntity.class)
+                .setParameter("ids", ids.collect(Collectors.toSet()));
+        return closing(query.getResultStream()).map(this::toAdapter);
+    }
+    
     @Override
     public Stream<RealmModel> getRealmsWithProviderTypeStream(Class<?> providerType) {
         TypedQuery<String> query = em.createNamedQuery("getRealmIdsWithProviderType", String.class);
@@ -147,9 +170,9 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
     }
 
     private Stream<RealmModel> getRealms(TypedQuery<String> query) {
-        return closing(query.getResultStream().map(session.realms()::getRealm).filter(Objects::nonNull));
+        return session.realms().getRealmsByIdsStream(closing(query.getResultStream()));
     }
-
+    
     @Override
     public RealmModel getRealmByName(String name) {
         TypedQuery<String> query = em.createNamedQuery("getRealmIdByName", String.class);
@@ -169,7 +192,7 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
             return false;
         }
         em.refresh(realm);
-        final RealmAdapter adapter = new RealmAdapter(session, em, realm);
+        final RealmAdapter adapter = toAdapter(realm);
         session.users().preRemove(adapter);
 
         realm.getDefaultGroupIds().clear();
@@ -324,22 +347,36 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
         query.setParameter("realm", realm.getId())
                 .setParameter("ids", ids.collect(Collectors.toList()));
 
-        return closing(paginateQuery(query, first, max).getResultStream())
-                .map(g -> session.roles().getRoleById(realm, g));
+        return session.roles().getRolesByIds(realm, closing(paginateQuery(query, first, max).getResultStream()));
     }
 
     @Override
     public Stream<RoleModel> getClientRolesStream(ClientModel client, Integer first, Integer max) {
-        TypedQuery<RoleEntity> query = em.createNamedQuery("getClientRoles", RoleEntity.class);
+        TypedQuery<String> query = em.createNamedQuery("getClientRoleIds", String.class);
         query.setParameter("client", client.getId());
 
-        return getRolesStream(query, client.getRealm(), first, max);
+        return session.roles().getRolesByIds(client.getRealm(), closing(query.getResultStream()));
     }
 
     protected Stream<RoleModel> getRolesStream(TypedQuery<RoleEntity> query, RealmModel realm, Integer first, Integer max) {
         Stream<RoleEntity> results = paginateQuery(query, first, max).getResultStream();
 
         return closing(results.map(role -> new RoleAdapter(session, realm, em, role)));
+    }
+    
+    @Override
+    public Stream<RoleModel> getClientsRolesStream(Stream<ClientModel> clients) {
+        Set<String> clientIds = new HashSet<>();
+        Set<RealmModel> realms = new HashSet<>();
+        clients.forEach(client -> {
+            clientIds.add(client.getId());
+            realms.add(client.getRealm());
+        });
+
+        TypedQuery<String> query = em.createNamedQuery("getClientRoleIdsFromIdList", String.class);
+        query.setParameter("clientids", clientIds);
+
+        return session.roles().getRolesByIds(realms, closing(query.getResultStream()));
     }
 
     @Override
@@ -430,25 +467,34 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
     }
     
     @Override
-    public Stream<RoleModel> getRolesByIds(RealmModel realm, Stream<String> ids) {
-        if (ids == null) return Stream.empty();
+    public Stream<RoleModel> getRolesByIds(Set<RealmModel> realms, Stream<String> ids) {
+        if (realms == null || realms.isEmpty() || ids == null) return Stream.empty();
 
+        Map<String, RealmModel> realmsById = realms.stream().collect(Collectors.toMap(RealmModel::getId, Function.identity()));
+        
         TypedQuery<RoleEntity> query = em.createNamedQuery("getRolesFromIdList", RoleEntity.class)
-                .setParameter("realm", realm.getId())
+                .setParameter("realmids", realms.stream().map(RealmModel::getId).collect(Collectors.toSet()))
                 .setParameter("ids", ids.collect(Collectors.toList()));
 
-        return closing(query.getResultStream().map(entity -> new RoleAdapter(session, realm, em, entity)));
+        return closing(query.getResultStream().map(entity -> new RoleAdapter(session, realmsById.get(entity.getRealmId()), em, entity)));
     }
     
     @Override
-    public Stream<RoleModel> getCompositeRolesByIds(RealmModel realm, Stream<CompositeRoleIdentifiersModel> compositeRoleIds) {
-        if (compositeRoleIds == null) return Stream.empty();
+    public Stream<RoleModel> getCompositeRolesByIds(Set<RealmModel> realms, Stream<CompositeRoleIdentifiersModel> compositeRoleIds) {
+        if (realms == null || realms.isEmpty() || compositeRoleIds == null) return Stream.empty();
 
+        List<String> ids = compositeRoleIds.map(CompositeRoleIdentifiersModel::getRoleId).collect(Collectors.toList());
+        
+        //HibernateSessionUtils.inspect(em);
+        
+        if (ids.isEmpty()) return Stream.empty();
+        Map<String, RealmModel> realmsById = realms.stream().collect(Collectors.toMap(RealmModel::getId, Function.identity()));
+        
         TypedQuery<RoleEntity> query = em.createNamedQuery("getRolesFromIdList", RoleEntity.class)
-                .setParameter("realm", realm.getId())
-                .setParameter("ids", compositeRoleIds.map(CompositeRoleIdentifiersModel::getRoleId).collect(Collectors.toList()));
+                .setParameter("realmids", realmsById.keySet())
+                .setParameter("ids", ids);
 
-        return closing(query.getResultStream().map(entity -> new RoleAdapter(session, realm, em, entity)));
+        return closing(query.getResultStream().map(entity -> new RoleAdapter(session, realmsById.get(entity.getRealmId()), em, entity)));
     }
 
     @Override
@@ -482,6 +528,9 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
                     // Remove already visited roles ids
                     .filter(roleId -> !alreadyVisitedRolesIds.contains(roleId))
                     .collect(Collectors.toSet());
+
+            // Detach CompositeRoleEntities as they are not used any more (less entities to manage into the JPA context)
+            //compositeRolesEntities.forEach(em::detach);
         }
         
         return collectedCompositeRoleIds.stream();
@@ -760,12 +809,27 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
     public ClientModel getClientById(RealmModel realm, String id) {
         logger.tracef("getClientById(%s, %s)%s", realm, id, getShortStackTrace());
 
+        //boolean existsInPersistenceContext = HibernateSessionUtils.existsInContext(em, id);
         ClientEntity client = em.find(ClientEntity.class, id);
         // Check if client belongs to this realm
         if (client == null || !realm.getId().equals(client.getRealmId())) return null;
+//        ClientAdapter adapter = existsInPersistenceContext ?
+//                new NonReleasableClientAdapter(realm, em, session, client)
+//                : new ClientAdapter(realm, em, session, client);
         ClientAdapter adapter = new ClientAdapter(realm, em, session, client);
         return adapter;
 
+    }
+    
+    public static class NonReleasableClientAdapter extends ClientAdapter {
+
+        public NonReleasableClientAdapter(RealmModel realm, EntityManager em, KeycloakSession session, ClientEntity entity) {
+            super(realm, em, session, entity);
+        }
+
+        @Override
+        public void release() {
+        }
     }
 
     @Override
@@ -887,12 +951,16 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
     }
 
     @Override
-    public Stream<ClientScopeModel> getClientScopesStream(RealmModel realm) {
+    public Stream<String> getClientScopeIdsStream(RealmModel realm) {
         TypedQuery<String> query = em.createNamedQuery("getClientScopeIds", String.class);
         query.setParameter("realm", realm.getId());
-        Stream<String> scopes = query.getResultStream();
 
-        return closing(scopes.map(realm::getClientScopeById));
+        return closing(query.getResultStream());
+    }
+
+    @Override
+    public Stream<ClientScopeModel> getClientScopesStream(RealmModel realm) {
+        return getClientScopeIdsStream(realm).map(realm::getClientScopeById);
     }
 
     @Override
@@ -1104,4 +1172,10 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
     public Set<String> getClientSearchableAttributes() {
         return clientSearchableAttributes;
     }
+
+    @Override
+    public void flushChanges() {
+        em.flush();
+    }
+    
 }

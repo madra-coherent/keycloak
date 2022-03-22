@@ -17,6 +17,7 @@
 
 package org.keycloak.models.cache.infinispan.entities;
 
+import org.jboss.logging.Logger;
 import org.keycloak.common.enums.SslRequired;
 import org.keycloak.common.util.MultivaluedHashMap;
 import org.keycloak.component.ComponentModel;
@@ -40,6 +41,8 @@ import org.keycloak.models.WebAuthnPolicy;
 import org.keycloak.models.cache.infinispan.DefaultLazyLoader;
 import org.keycloak.models.cache.infinispan.LazyLoader;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -263,9 +266,8 @@ public class CachedRealm extends AbstractExtendableRevisioned {
         adminEventsEnabled = model.isAdminEventsEnabled();
         adminEventsDetailsEnabled = model.isAdminEventsDetailsEnabled();
 
-        defaultRoleId = model.getDefaultRole().getId();
-        ClientModel masterAdminClient = model.getMasterAdminClient();
-        this.masterAdminClient = (masterAdminClient != null) ? masterAdminClient.getId() : null;
+        defaultRoleId = model.getDefaultRoleId();
+        this.masterAdminClient = model.getMasterAdminClientId();
 
         cacheClientScopes(model);
 
@@ -318,12 +320,16 @@ public class CachedRealm extends AbstractExtendableRevisioned {
         realmLocalizationTexts = model.getRealmLocalizationTexts();
     }
 
+    protected static final Logger logger = Logger.getLogger(CachedRealm.class);
+            
     protected void cacheClientScopes(RealmModel model) {
-        clientScopes = model.getClientScopesStream().map(ClientScopeModel::getId).collect(Collectors.toList());
-        defaultDefaultClientScopes = model.getDefaultClientScopesStream(true).map(ClientScopeModel::getId)
-                .collect(Collectors.toList());
-        optionalDefaultClientScopes = model.getDefaultClientScopesStream(false).map(ClientScopeModel::getId)
-                .collect(Collectors.toList());
+        Instant start = Instant.now();
+        clientScopes = model.getClientScopeIdsStream().collect(Collectors.toList());
+        //logger.infof("Collected %d client scopes in %d ms for realm  %s", clientScopes.size(), Duration.between(start, Instant.now()).toMillis(), model.getName());
+        defaultDefaultClientScopes = model.getDefaultClientScopeIdsStream().collect(Collectors.toList());
+        Set<String> defaultScopes = new HashSet<>(defaultDefaultClientScopes);
+        optionalDefaultClientScopes = clientScopes.stream().filter(scope -> !defaultScopes.contains(scope)).collect(Collectors.toList());
+        //logger.infof("   Total: %d ms for realm  %s", Duration.between(start, Instant.now()).toMillis(), model.getName());
     }
 
     public String getMasterAdminClient() {

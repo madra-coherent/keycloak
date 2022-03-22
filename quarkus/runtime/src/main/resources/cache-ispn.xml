@@ -28,7 +28,7 @@
                 <key media-type="application/x-java-object"/>
                 <value media-type="application/x-java-object"/>
             </encoding>
-            <memory max-count="10000"/>
+            <memory max-count="100000"/>
         </local-cache>
         <local-cache name="users">
             <encoding>
