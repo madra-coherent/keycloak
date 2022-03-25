@@ -892,90 +892,72 @@ public class RealmCacheSession implements CacheRealmProvider {
         
         RealmRestrictedRoleCacheOperation cacheOp = new RealmRestrictedRoleCacheOperation(this, realms);
         
-        Map<Boolean, Set<String>> idsByInvalidationStatus = ids.collect(Collectors.groupingBy(invalidations::contains, Collectors.toSet()));
-        // Ensure that both entries exist in the by-invalidation status ids map - avoids null checks downstream
-        idsByInvalidationStatus.putIfAbsent(Boolean.TRUE, Collections.emptySet());
-        idsByInvalidationStatus.putIfAbsent(Boolean.FALSE, Collections.emptySet());
-        
-        // Only perform cache lookup for not invalidated ids
-        Map<String, Optional<? extends RoleModel>> cachedRoleLookup = idsByInvalidationStatus.get(Boolean.FALSE).stream()
-                .collect(Collectors.toMap(Function.identity(), cacheOp::get));
-        
-        Set<String> invalidatedIds = idsByInvalidationStatus.get(Boolean.TRUE); 
-        Set<String> missingRoleIds = Stream.concat(
-                invalidatedIds.stream(),
-                // Add cache misses to the list of ids to retrieve from delegate
-                cachedRoleLookup.entrySet().stream().filter(entry -> !entry.getValue().isPresent()).map(Map.Entry::getKey)
-                )
+        // Cache lookup
+        Map<String, Optional<RoleModel>> rolesCacheLookup = ids.collect(Collectors.toMap(Function.identity(), cacheOp::get));
+
+        // Cache hit
+        Stream<RoleModel> cacheHitRoles = rolesCacheLookup.values().stream()
+                .filter(Optional::isPresent)
+                .map(Optional::get); 
+
+        // Cache miss
+        Set<String> missingRolesIds = rolesCacheLookup.entrySet().stream()
+                .filter(entry -> !entry.getValue().isPresent())
+                .map(Map.Entry::getKey)
                 .collect(Collectors.toSet());
+
+        Stream<RoleModel> cacheMissRoles = Stream.empty();
+        if (!missingRolesIds.isEmpty()) {
+            cacheMissRoles = getRoleDelegate().getRolesByIds(realms, missingRolesIds.stream())
+                    .map(ReleaseResource.after(cacheOp::put))
+                    .filter(Optional::isPresent)
+                    .map(Optional::get);
+        }
         
-        Stream<RoleModel> rolesFromDelegate = getRoleDelegate().getRolesByIds(realms, missingRoleIds.stream())
-                // Convert only the non invalidated roles to cached, managed roles 
-                .map(role -> invalidatedIds.contains(role.getId())
-                        ? Optional.of(role)
-                        : ReleaseResource.after(cacheOp::put).apply(role)
-                )
-                .filter(Optional::isPresent) // Should not be necessary as all previous lookups are realm-restricted, but... 
-                .map(Optional::get)
-                ;
         // TODO: add check that all missing roles have been indeed collected - if not, this means that the initial
         // caller provided a wrong set of ids, maybe because relying on stale data
         // Need a way to signal that upstream? How? Using a nullable Optional?
-        
-        return Stream.concat(
-                cachedRoleLookup.values().stream().filter(Optional::isPresent).map(Optional::get), // keep only the cache hits
-                rolesFromDelegate
-                );
+
+        return Stream.concat(cacheHitRoles, cacheMissRoles);
     }
     
     @Override
     public Stream<RoleModel> getRolesByCompositions(Set<RealmModel> realms, Stream<RoleCompositionModel> roleCompositions) {
         if (realms == null || roleCompositions == null) return Stream.empty();
-        
-        RealmRestrictedRoleCacheOperation cacheOp = new RealmRestrictedRoleCacheOperation(this, realms);
 
+        RealmRestrictedRoleCacheOperation cacheOp = new RealmRestrictedRoleCacheOperation(this, realms);
         Map<String, RoleCompositionModel> roleCompositionsById =
                 roleCompositions.collect(Collectors.toMap(RoleCompositionModel::getRoleId, Function.identity()));
         
-        Map<Boolean, Set<RoleCompositionModel>> idsByInvalidationStatus = roleCompositionsById.values().stream()
-                .collect(Collectors.groupingBy(composite -> invalidations.contains(composite.getRoleId()), Collectors.toSet()));
-        
-        // Ensure that both entries exist in the by-invalidation status ids map - avoids null checks downstream
-        idsByInvalidationStatus.putIfAbsent(Boolean.TRUE, Collections.emptySet());
-        idsByInvalidationStatus.putIfAbsent(Boolean.FALSE, Collections.emptySet());
-        
-        // Only perform cache lookup for not invalidated ids
-        Map<RoleCompositionModel, Optional<? extends RoleModel>> cachedRoleLookup = idsByInvalidationStatus.get(Boolean.FALSE).stream()
-                .collect(Collectors.toMap(Function.identity(), roleIds -> cacheOp.get(roleIds.getRoleId())));
+        // Cache lookup
+        Map<RoleCompositionModel, Optional<RoleModel>> rolesCacheLookup = roleCompositionsById.values().stream()
+                .collect(Collectors.toMap(Function.identity(), cacheOp::get));
 
-        Set<RoleCompositionModel> invalidatedIds = idsByInvalidationStatus.get(Boolean.TRUE);
-        
-        Stream<RoleCompositionModel> missingRoleIds = Stream.concat(
-                invalidatedIds.stream(),
-                // Add cache misses to the list of ids to retrieve from delegate
-                cachedRoleLookup.entrySet().stream().filter(entry -> !entry.getValue().isPresent()).map(Map.Entry::getKey)
-                );
+        // Cache hit
+        Stream<RoleModel> cacheHitRoles = rolesCacheLookup.values().stream()
+                .filter(Optional::isPresent)
+                .map(Optional::get); 
 
-        Stream<RoleModel> cacheMissRoles = getRoleDelegate().getRolesByCompositions(realms, missingRoleIds)
-                // Convert only the non invalidated roles to cached, managed roles 
-                .map(role -> {
-                    RoleCompositionModel roleComposition = roleCompositionsById.get(role.getId());
-                    return invalidatedIds.contains(roleComposition)
-                        ? Optional.of(role)
-                        : ReleaseResource.after(cacheOp::put).apply(new ComposedRoleModel(role, roleComposition));
-                })
-                .filter(Optional::isPresent) // Should not be necessary as all previous lookups are realm-restricted, but... 
-                .map(Optional::get)
-                ;
+        // Cache miss
+        Set<RoleCompositionModel> missingRoleCompositions = rolesCacheLookup.entrySet().stream()
+                .filter(entry -> !entry.getValue().isPresent())
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toSet());
+
+        Stream<RoleModel> cacheMissRoles = Stream.empty();
+        if (!missingRoleCompositions.isEmpty()) {
+            cacheMissRoles = getRoleDelegate().getRolesByCompositions(realms, missingRoleCompositions.stream())
+                    .map(r -> new ComposedRoleModel(r, roleCompositionsById.get(r.getId())))
+                    .map(ReleaseResource.after(cacheOp::put))
+                    .filter(Optional::isPresent)
+                    .map(Optional::get);
+        }
+        
         // TODO: add check that all missing roles have been indeed collected - if not, this means that the initial
         // caller provided a wrong set of ids, maybe because relying on stale data
-        // Need a way to signal that upstream? How? Using an Optional?
-        
-        
-        return Stream.concat(
-                cachedRoleLookup.values().stream().filter(Optional::isPresent).map(Optional::get), // keep only the cache hits
-                cacheMissRoles
-                );
+        // Need a way to signal that upstream? How? Using a nullable Optional?
+
+        return Stream.concat(cacheHitRoles, cacheMissRoles);
     }
     
     @Override
