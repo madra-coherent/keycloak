@@ -1,7 +1,7 @@
 package org.keycloak.models.resource;
 
 /**
- * Contract for model entities which allow to release resources they detain.
+ * Contract for model entities which allow to release resources they may detain.
  */
 public interface Releasable {
 
