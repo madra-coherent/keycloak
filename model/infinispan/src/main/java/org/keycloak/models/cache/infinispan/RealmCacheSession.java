@@ -701,37 +701,6 @@ public class RealmCacheSession implements CacheRealmProvider {
 
     @Override
     public Stream<RoleModel> getClientRolesStream(ClientModel client) {
-//        String cacheKey = getRolesCacheKey(client.getId());
-//        boolean queryDB = invalidations.contains(cacheKey) || listInvalidations.contains(client.getId()) || listInvalidations.contains(client.getRealm().getId());
-//        if (queryDB) {
-//            return getRoleDelegate().getClientRolesStream(client);
-//        }
-//
-//        RoleListQuery query = cache.get(cacheKey, RoleListQuery.class);
-//        if (query != null) {
-//            logger.tracev("getClientRoles cache hit: {0}", client.getClientId());
-//        }
-//
-//        if (query == null) {
-//            Long loaded = cache.getCurrentRevision(cacheKey);
-//            Set<RoleModel> model = getRoleDelegate().getClientRolesStream(client).collect(Collectors.toSet());
-//            if (model == null) return null;
-//            Set<String> ids = model.stream().map(RoleModel::getId).collect(Collectors.toSet());
-//            query = new RoleListQuery(loaded, cacheKey, client.getRealm(), ids, client.getClientId());
-//            logger.tracev("adding client roles cache miss: client {0} key {1}", client.getClientId(), cacheKey);
-//            cache.addRevisioned(query, startupRevision);
-//            return model.stream();
-//        }
-//        Set<RoleModel> list = new HashSet<>();
-//        for (String id : query.getRoles()) {
-//            RoleModel role = session.roles().getRoleById(client.getRealm(), id);
-//            if (role == null) {
-//                invalidations.add(cacheKey);
-//                return getRoleDelegate().getClientRolesStream(client);
-//            }
-//            list.add(role);
-//        }
-//        return list.stream();
         return getClientsRolesStream(Stream.of(client));
     }
 
@@ -759,40 +728,29 @@ public class RealmCacheSession implements CacheRealmProvider {
     
     @Override
     public Stream<RoleModel> getClientsRolesStream(Stream<ClientModel> clients) {
-        logger.infof("Performing client role id cache lookup");
         Map<ClientModel, Optional<Set<String>>> cachedRoleIdsLookupByClient = clients
                 .collect(Collectors.toMap(Function.identity(), this::getCachedRoleIdsForClient));
-        logger.infof("Client role id cache lookup: %d hits, %d total",
-                cachedRoleIdsLookupByClient.values().stream().filter(Optional::isPresent).collect(Collectors.counting()),
-                cachedRoleIdsLookupByClient.size()
-                );
         
         // Bulk loading roles for clients with a cache hit
-        logger.infof("Loading client roles with a cache hit");
         Set<RoleModel> rolesFromCacheHits = getRolesByIds(
                 cachedRoleIdsLookupByClient.keySet().stream().map(ClientModel::getRealm).collect(Collectors.toSet()),
                 cachedRoleIdsLookupByClient.values().stream().filter(Optional::isPresent).map(Optional::get).flatMap(Collection::stream)
                 )
                 .collect(Collectors.toSet());
-        logger.infof("Loaded %d client roles with a cache hit", rolesFromCacheHits.size());
         
         // Bulk loading roles for clients with a cache miss (if any)
         Set<RoleModel> rolesFromCacheMisses = Collections.emptySet();
         Set<ClientModel> clientsFromCacheMisses = cachedRoleIdsLookupByClient.entrySet().stream()
                 .filter(entry -> !entry.getValue().isPresent()).map(Map.Entry::getKey).collect(Collectors.toSet());
         if (clientsFromCacheMisses.size()>0) {
-            logger.infof("Loading client roles with a cache miss");
             rolesFromCacheMisses = getRoleDelegate().getClientsRolesStream(clientsFromCacheMisses.stream()).collect(Collectors.toSet());
-            logger.infof("Loaded %d client roles with a cache miss", rolesFromCacheMisses.size());
 
             // Populating cache
-            logger.infof("Populating client roles id lookup cache");
             Map<String, Set<String>> cacheMissRolesByClientId = rolesFromCacheMisses.stream()
                     .collect(Collectors.groupingBy(RoleModel::getContainerId, Collectors.mapping(RoleModel::getId, Collectors.toSet())));
             clientsFromCacheMisses.stream().forEach(client -> putCachedClientRoleIds(client,
                     Optional.ofNullable(cacheMissRolesByClientId.get(client.getId())).orElse(Collections.emptySet())
                     ));
-            logger.infof("Populated client roles id lookup cache");
         }
         
         return Stream.concat(rolesFromCacheHits.stream(), rolesFromCacheMisses.stream());
@@ -1346,15 +1304,13 @@ public class RealmCacheSession implements CacheRealmProvider {
             } else {
                 cache.addRevisioned(cached, startupRevision);
             }
-            // Release the underlying delegate (potentially detaching the entity) as this now fully cached
-            delegate.release();
         } else {
             cached = new CachedClient(revision, realm, delegate);
             adapter = new ClientAdapter(realm, cached, this);
             cache.addRevisioned(cached, startupRevision);
-            // Release the underlying delegate (potentially detaching the entity) as this now fully cached
-            delegate.release();
         }
+        // Release the underlying delegate (potentially detaching the entity) as this now fully cached
+        delegate.release();
 
         return adapter;
     }

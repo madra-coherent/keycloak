@@ -32,6 +32,7 @@ import org.keycloak.models.utils.RoleUtils;
 
 import javax.persistence.EntityManager;
 
+import java.io.Serializable;
 import java.security.MessageDigest;
 import java.util.Collections;
 import java.util.HashMap;
@@ -40,6 +41,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 /**
@@ -52,12 +54,22 @@ public class ClientAdapter implements ClientModel, JpaModel<ClientEntity> {
     protected RealmModel realm;
     protected EntityManager em;
     protected ClientEntity entity;
+    protected boolean detachable;
 
     public ClientAdapter(RealmModel realm, EntityManager em, KeycloakSession session, ClientEntity entity) {
+        this(realm, em, session, entity, false);
+    }
+    
+    public ClientAdapter(RealmModel realm, EntityManager em, KeycloakSession session, ClientEntity entity, Predicate<Serializable> detachCondition) {
+        this(realm, em, session, entity, detachCondition.test(entity.getId()));
+    }
+
+    public ClientAdapter(RealmModel realm, EntityManager em, KeycloakSession session, ClientEntity entity, boolean detachable) {
         this.session = session;
         this.realm = realm;
         this.em = em;
         this.entity = entity;
+        this.detachable = detachable;
     }
 
     @Override
@@ -737,8 +749,7 @@ public class ClientAdapter implements ClientModel, JpaModel<ClientEntity> {
 
     @Override
     public void release() {
-        if (getEntity() == null) return;
-        em.flush();
+        if (!detachable || getEntity() == null) return;
         em.detach(getEntity());
     }
     

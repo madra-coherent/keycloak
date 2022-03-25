@@ -299,6 +299,4 @@ public interface ClientModel extends ClientScopeModel, RoleContainerModel,  Prot
         return consentScreenText;
     }
     
-    default void release() {}
-
 }

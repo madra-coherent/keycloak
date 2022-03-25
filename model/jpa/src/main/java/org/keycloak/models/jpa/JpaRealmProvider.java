@@ -795,6 +795,10 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
         return resource;
     }
 
+    private JpaDetachCondition getDetachClientsCondition(Collection<String> clientIds) {
+        return new JpaDetachCondition(clientIds, new HibernateContextAbsencePredicate(ClientEntity.class, em));
+    }
+
     @Override
     public Stream<ClientModel> getClientsStream(RealmModel realm) {
         return getClientsStream(realm, null, null);
@@ -823,10 +827,12 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
     public ClientModel getClientById(RealmModel realm, String id) {
         logger.tracef("getClientById(%s, %s)%s", realm, id, getShortStackTrace());
 
+        JpaDetachCondition detachCondition = getDetachClientsCondition(Collections.singleton(id));
+        
         ClientEntity client = em.find(ClientEntity.class, id);
         // Check if client belongs to this realm
         if (client == null || !realm.getId().equals(client.getRealmId())) return null;
-        ClientAdapter adapter = new ClientAdapter(realm, em, session, client);
+        ClientAdapter adapter = new ClientAdapter(realm, em, session, client, detachCondition);
         return adapter;
 
     }
