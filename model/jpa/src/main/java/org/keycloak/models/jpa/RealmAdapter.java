@@ -28,6 +28,8 @@ import org.keycloak.models.*;
 import org.keycloak.models.jpa.entities.*;
 import org.keycloak.models.utils.ComponentUtil;
 import org.keycloak.models.utils.KeycloakModelUtils;
+import org.keycloak.storage.jpa.resources.HibernateContextAbsencePredicate;
+import org.keycloak.storage.jpa.resources.JpaDetachCondition;
 
 import javax.persistence.EntityManager;
 import javax.persistence.LockModeType;
@@ -1602,11 +1604,14 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
 
     @Override
     public AuthenticationFlowModel getAuthenticationFlowById(String id) {
+        JpaDetachCondition detachCondition = new JpaDetachCondition(Collections.singleton(id),
+                new HibernateContextAbsencePredicate(AuthenticationFlowEntity.class, em));
         AuthenticationFlowEntity entity = getAuthenticationFlowEntity(id, false);
         if (entity == null) return null;
         AuthenticationFlowModel model = entityToModel(entity);
-        em.flush();
-        em.detach(entity);
+        if (detachCondition.test(id)) {
+            em.detach(entity);
+        }
         return model;
     }
 
