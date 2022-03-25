@@ -18,6 +18,7 @@
 package org.keycloak.models;
 
 import java.util.Map;
+
 import org.keycloak.provider.Provider;
 
 import java.util.List;
@@ -415,4 +416,5 @@ public interface RealmProvider extends Provider /* TODO: Remove in future versio
      * @deprecated Use the corresponding method from {@link GroupProvider}. */
     @Override
     void addTopLevelGroup(RealmModel realm, GroupModel subGroup);
+    
 }

@@ -29,11 +29,9 @@ import org.keycloak.storage.client.ClientStorageProvider;
 import org.keycloak.storage.client.ClientStorageProviderModel;
 import org.keycloak.storage.role.RoleStorageProvider;
 import org.keycloak.storage.role.RoleStorageProviderModel;
-import org.keycloak.utils.StringUtil;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -85,9 +83,6 @@ public interface RealmModel extends RoleContainerModel {
         IdentityProviderModel getRemovedIdentityProvider();
         KeycloakSession getKeycloakSession();
     }
-
-    @Override
-    String getId();
 
     String getName();
 
@@ -1057,7 +1052,5 @@ public interface RealmModel extends RoleContainerModel {
     void removeClientInitialAccessModel(String id);
     Stream<ClientInitialAccessModel> getClientInitialAccesses();
     void decreaseRemainingCount(ClientInitialAccessModel clientInitialAccess);
-    
-    default void release() {
-    }
+
 }

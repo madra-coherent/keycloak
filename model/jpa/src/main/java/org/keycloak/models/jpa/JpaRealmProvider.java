@@ -36,7 +36,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.persistence.EntityManager;
 import javax.persistence.LockModeType;
-import javax.persistence.Persistence;
 import javax.persistence.TypedQuery;
 import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaDelete;
@@ -45,7 +44,6 @@ import javax.persistence.criteria.Join;
 import javax.persistence.criteria.Predicate;
 import javax.persistence.criteria.Root;
 
-import org.apache.commons.lang.StringUtils;
 import org.jboss.logging.Logger;
 import org.keycloak.common.util.Time;
 import org.keycloak.connections.jpa.util.JpaUtils;
@@ -54,7 +52,7 @@ import org.keycloak.models.ClientModel;
 import org.keycloak.models.ClientProvider;
 import org.keycloak.models.ClientScopeModel;
 import org.keycloak.models.ClientScopeProvider;
-import org.keycloak.models.CompositeRoleIdentifiersModel;
+import org.keycloak.models.RoleCompositionModel;
 import org.keycloak.models.DeploymentStateProvider;
 import org.keycloak.models.GroupModel;
 import org.keycloak.models.GroupProvider;
@@ -78,6 +76,8 @@ import org.keycloak.models.jpa.entities.RealmEntity;
 import org.keycloak.models.jpa.entities.RealmLocalizationTextsEntity;
 import org.keycloak.models.jpa.entities.RoleEntity;
 import org.keycloak.protocol.oidc.OIDCLoginProtocol;
+import org.keycloak.storage.jpa.resources.HibernateContextAbsencePredicate;
+import org.keycloak.storage.jpa.resources.JpaDetachCondition;
 import org.keycloak.models.utils.KeycloakModelUtils;
 
 /**
@@ -107,9 +107,13 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
     }
 
     protected RealmAdapter toAdapter(RealmEntity realm) {
-        //HibernateSessionUtils.inspect(em);
         return new RealmAdapter(session, em, realm);
     }
+
+    protected RealmAdapter toAdapter(RealmEntity realm, JpaDetachCondition detachCondition) {
+        return new RealmAdapter(session, em, realm, detachCondition);
+    }
+
     @Override
     public RealmModel createRealm(String id, String name) {
         RealmEntity realm = new RealmEntity();
@@ -131,17 +135,19 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
         return adapter;
     }
 
-    @Override
-    public RealmModel getRealm(String id) {
-        
-        //HibernateSessionUtils.inspect(em);
-
-        RealmEntity realm = em.find(RealmEntity.class, id);
-        if (realm == null) return null;
-        RealmAdapter adapter = toAdapter(realm);
-        return adapter;
+    private JpaDetachCondition getDetachRealmsCondition(Collection<String> realmIds) {
+        return new JpaDetachCondition(realmIds, new HibernateContextAbsencePredicate(RealmEntity.class, em));
     }
 
+    @Override
+    public RealmModel getRealm(String id) {
+        JpaDetachCondition detachCondition = getDetachRealmsCondition(Collections.singleton(id));
+        RealmEntity realm = em.find(RealmEntity.class, id);
+        if (realm == null) return null;
+        RealmAdapter adapter = toAdapter(realm, detachCondition);
+        return adapter;
+    }
+    
     @Override
     public Stream<String> getRealmIdsStream() {
         TypedQuery<String> query = em.createNamedQuery("getAllRealmIds", String.class);
@@ -151,9 +157,11 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
     @Override
     public Stream<RealmModel> getRealmsByIdsStream(Stream<String> ids) {
         if (ids==null) return Stream.empty();
+        Collection<String> realmIds = ids.collect(Collectors.toSet());
+        JpaDetachCondition detachCondition = getDetachRealmsCondition(realmIds);
         TypedQuery<RealmEntity> query = em.createNamedQuery("getRealmsByIds", RealmEntity.class)
-                .setParameter("ids", ids.collect(Collectors.toSet()));
-        return closing(query.getResultStream()).map(this::toAdapter);
+                .setParameter("ids", realmIds);
+        return closing(query.getResultStream()).map(r -> toAdapter(r, detachCondition));
     }
     
     @Override
@@ -457,12 +465,17 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
         client.getRolesStream().forEach(this::removeRole);
     }
 
+    private JpaDetachCondition getDetachRolesCondition(Collection<String> roleIds) {
+        return new JpaDetachCondition(roleIds, new HibernateContextAbsencePredicate(RoleEntity.class, em));
+    }
+    
     @Override
     public RoleModel getRoleById(RealmModel realm, String id) {
+        JpaDetachCondition detachCondition = getDetachRolesCondition(Collections.singleton(id));
         RoleEntity entity = em.find(RoleEntity.class, id);
         if (entity == null) return null;
         if (!realm.getId().equals(entity.getRealmId())) return null;
-        RoleAdapter adapter = new RoleAdapter(session, realm, em, entity);
+        RoleAdapter adapter = new RoleAdapter(session, realm, em, entity, detachCondition);
         return adapter;
     }
     
@@ -471,37 +484,38 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
         if (realms == null || realms.isEmpty() || ids == null) return Stream.empty();
 
         Map<String, RealmModel> realmsById = realms.stream().collect(Collectors.toMap(RealmModel::getId, Function.identity()));
+        Collection<String> roleIds = ids.collect(Collectors.toSet());
+        JpaDetachCondition detachCondition = getDetachRolesCondition(roleIds);
         
         TypedQuery<RoleEntity> query = em.createNamedQuery("getRolesFromIdList", RoleEntity.class)
                 .setParameter("realmids", realms.stream().map(RealmModel::getId).collect(Collectors.toSet()))
-                .setParameter("ids", ids.collect(Collectors.toList()));
+                .setParameter("ids", roleIds);
 
-        return closing(query.getResultStream().map(entity -> new RoleAdapter(session, realmsById.get(entity.getRealmId()), em, entity)));
+        return closing(query.getResultStream().map(entity -> new RoleAdapter(session, realmsById.get(entity.getRealmId()), em, entity, detachCondition)));
     }
     
     @Override
-    public Stream<RoleModel> getCompositeRolesByIds(Set<RealmModel> realms, Stream<CompositeRoleIdentifiersModel> compositeRoleIds) {
-        if (realms == null || realms.isEmpty() || compositeRoleIds == null) return Stream.empty();
+    public Stream<RoleModel> getRolesByCompositions(Set<RealmModel> realms, Stream<RoleCompositionModel> roleCompositions) {
+        if (realms == null || realms.isEmpty() || roleCompositions == null) return Stream.empty();
 
-        List<String> ids = compositeRoleIds.map(CompositeRoleIdentifiersModel::getRoleId).collect(Collectors.toList());
-        
-        //HibernateSessionUtils.inspect(em);
+        List<String> ids = roleCompositions.map(RoleCompositionModel::getRoleId).collect(Collectors.toList());
         
         if (ids.isEmpty()) return Stream.empty();
+        JpaDetachCondition detachCondition = getDetachRolesCondition(ids);
         Map<String, RealmModel> realmsById = realms.stream().collect(Collectors.toMap(RealmModel::getId, Function.identity()));
         
         TypedQuery<RoleEntity> query = em.createNamedQuery("getRolesFromIdList", RoleEntity.class)
                 .setParameter("realmids", realmsById.keySet())
                 .setParameter("ids", ids);
 
-        return closing(query.getResultStream().map(entity -> new RoleAdapter(session, realmsById.get(entity.getRealmId()), em, entity)));
+        return closing(query.getResultStream().map(entity -> new RoleAdapter(session, realmsById.get(entity.getRealmId()), em, entity, detachCondition)));
     }
 
     @Override
-    public Stream<CompositeRoleIdentifiersModel> getDeepCompositeRoleIdsStream(RealmModel realm, Stream<String> ids) {
+    public Stream<RoleCompositionModel> getDeepRoleCompositionsStream(RealmModel realm, Stream<String> ids) {
         if (ids == null) return Stream.empty();
 
-        Collection<CompositeRoleIdentifiersModel> collectedCompositeRoleIds = new LinkedList<>();
+        Collection<RoleCompositionModel> collectedRoleCompositions = new LinkedList<>();
         Set<String> roleIdsToCollectChildRoleIdsFrom = ids.collect(Collectors.toSet());
         Set<String> alreadyVisitedRolesIds = new HashSet<>();
         
@@ -511,13 +525,13 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
                     .getResultList(); 
 
             // Group all composite child role ids by their composite role id
-            Map<String, Set<String>> compositeRoleIds = compositeRolesEntities.stream()
+            Map<String, Set<String>> roleCompositions = compositeRolesEntities.stream()
                     .collect(Collectors.groupingBy(CompositeRoleEntity::getCompositeId,
                             Collectors.mapping(CompositeRoleEntity::getChildRoleId, Collectors.toSet())));
             
             // Ensure that role ids having no children (therefore not in the result set above) are also collected
-            collectedCompositeRoleIds.addAll(roleIdsToCollectChildRoleIdsFrom.stream()
-                    .map(roleId -> new CompositeRoleIdentifiersModel(roleId, compositeRoleIds.getOrDefault(roleId, Collections.emptySet())))
+            collectedRoleCompositions.addAll(roleIdsToCollectChildRoleIdsFrom.stream()
+                    .map(roleId -> new RoleCompositionModel(roleId, roleCompositions.getOrDefault(roleId, Collections.emptySet())))
                     .collect(Collectors.toList())
                     );
             
@@ -530,10 +544,10 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
                     .collect(Collectors.toSet());
 
             // Detach CompositeRoleEntities as they are not used any more (less entities to manage into the JPA context)
-            //compositeRolesEntities.forEach(em::detach);
+            compositeRolesEntities.forEach(em::detach);
         }
         
-        return collectedCompositeRoleIds.stream();
+        return collectedRoleCompositions.stream();
     }
 
     @Override
@@ -809,29 +823,14 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
     public ClientModel getClientById(RealmModel realm, String id) {
         logger.tracef("getClientById(%s, %s)%s", realm, id, getShortStackTrace());
 
-        //boolean existsInPersistenceContext = HibernateSessionUtils.existsInContext(em, id);
         ClientEntity client = em.find(ClientEntity.class, id);
         // Check if client belongs to this realm
         if (client == null || !realm.getId().equals(client.getRealmId())) return null;
-//        ClientAdapter adapter = existsInPersistenceContext ?
-//                new NonReleasableClientAdapter(realm, em, session, client)
-//                : new ClientAdapter(realm, em, session, client);
         ClientAdapter adapter = new ClientAdapter(realm, em, session, client);
         return adapter;
 
     }
     
-    public static class NonReleasableClientAdapter extends ClientAdapter {
-
-        public NonReleasableClientAdapter(RealmModel realm, EntityManager em, KeycloakSession session, ClientEntity entity) {
-            super(realm, em, session, entity);
-        }
-
-        @Override
-        public void release() {
-        }
-    }
-
     @Override
     public ClientModel getClientByClientId(RealmModel realm, String clientId) {
         logger.tracef("getClientByClientId(%s, %s)%s", realm, clientId, getShortStackTrace());
@@ -1173,9 +1172,4 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
         return clientSearchableAttributes;
     }
 
-    @Override
-    public void flushChanges() {
-        em.flush();
-    }
-    
 }

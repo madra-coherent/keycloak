@@ -32,6 +32,8 @@ import org.keycloak.models.utils.KeycloakModelUtils;
 import javax.persistence.EntityManager;
 import javax.persistence.LockModeType;
 import javax.persistence.TypedQuery;
+
+import java.io.Serializable;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -49,6 +51,7 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
     protected RealmEntity realm;
     protected EntityManager em;
     protected KeycloakSession session;
+    protected boolean detachable;
 
     @Override
     public Long getClientsCount() {
@@ -59,9 +62,18 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
     private OTPPolicy otpPolicy;
 
     public RealmAdapter(KeycloakSession session, EntityManager em, RealmEntity realm) {
+        this(session, em, realm, false);
+    }
+    
+    public RealmAdapter(KeycloakSession session, EntityManager em, RealmEntity realm, Predicate<Serializable> detachCondition) {
+        this(session, em, realm, detachCondition.test(realm.getId()));
+    }
+    
+    public RealmAdapter(KeycloakSession session, EntityManager em, RealmEntity realm, boolean detachable) {
         this.session = session;
         this.em = em;
         this.realm = realm;
+        this.detachable = detachable;
     }
 
     public RealmEntity getEntity() {
@@ -1676,8 +1688,6 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
         model.setParentFlow(entity.getParentFlow().getId());
         model.setAuthenticatorFlow(entity.isAutheticatorFlow());
         model.setAuthenticatorConfig(entity.getAuthenticatorConfig());
-//        em.flush();
-//        em.detach(entity);
         return model;
     }
 
@@ -2337,7 +2347,7 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
 
     @Override
     public void release() {
-        em.flush();
+        if (!detachable || realm == null) return;
         em.detach(realm);
     }
     

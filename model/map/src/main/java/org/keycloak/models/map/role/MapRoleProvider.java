@@ -19,7 +19,7 @@ package org.keycloak.models.map.role;
 
 import org.jboss.logging.Logger;
 import org.keycloak.models.ClientModel;
-import org.keycloak.models.CompositeRoleIdentifiersModel;
+import org.keycloak.models.RoleCompositionModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.ModelDuplicateException;
 import org.keycloak.models.RealmModel;
@@ -121,11 +121,11 @@ public class MapRoleProvider implements RoleProvider {
     }
     
     @Override
-    public Stream<CompositeRoleIdentifiersModel> getDeepCompositeRoleIdsStream(RealmModel realm, Stream<String> ids) {
+    public Stream<RoleCompositionModel> getDeepRoleCompositionsStream(RealmModel realm, Stream<String> ids) {
         LOG.tracef("getDeepCompositeRoleIdsStream(%s, %s)%s", realm, ids, getShortStackTrace());
         if (ids == null) return Stream.empty();
 
-        Collection<CompositeRoleIdentifiersModel> collectedCompositeRoleIds = new LinkedList<>();
+        Collection<RoleCompositionModel> collectedRoleCompositions = new LinkedList<>();
         Set<String> roleIdsToCollectChildRoleIdsFrom = ids.collect(Collectors.toSet());
         // Keep track of already visited composite roles ids, so that children collection happens only once
         Set<String> alreadyVisitedRolesIds = new HashSet<>();
@@ -139,8 +139,8 @@ public class MapRoleProvider implements RoleProvider {
                     .collect(Collectors.toMap(MapRoleEntity::getId, MapRoleEntity::getCompositeRoles));
 
             // Ensure that role ids having no children (may not be in the result set above) are also collected
-            collectedCompositeRoleIds.addAll(roleIdsToCollectChildRoleIdsFrom.stream()
-                    .map(roleId -> new CompositeRoleIdentifiersModel(roleId, compositeRoleIds.getOrDefault(roleId, Collections.emptySet())))
+            collectedRoleCompositions.addAll(roleIdsToCollectChildRoleIdsFrom.stream()
+                    .map(roleId -> new RoleCompositionModel(roleId, compositeRoleIds.getOrDefault(roleId, Collections.emptySet())))
                     .collect(Collectors.toList())
                     );
 
@@ -153,7 +153,7 @@ public class MapRoleProvider implements RoleProvider {
                     .collect(Collectors.toSet());
         }
         
-        return collectedCompositeRoleIds.stream();
+        return collectedRoleCompositions.stream();
     }
 
     @Override
@@ -338,18 +338,18 @@ public class MapRoleProvider implements RoleProvider {
     }
 
     @Override
-    public Stream<RoleModel> getCompositeRolesByIds(Set<RealmModel> realms, Stream<CompositeRoleIdentifiersModel> compositeRoleIds) {
-        if (compositeRoleIds == null || realms == null || realms.isEmpty()) {
+    public Stream<RoleModel> getRolesByCompositions(Set<RealmModel> realms, Stream<RoleCompositionModel> roleCompositions) {
+        if (roleCompositions == null || realms == null || realms.isEmpty()) {
             return Stream.empty();
         }
 
-        LOG.tracef("getCompositeRolesByIds(%s, %s)%s", realms, compositeRoleIds, getShortStackTrace());
+        LOG.tracef("getCompositeRolesByIds(%s, %s)%s", realms, roleCompositions, getShortStackTrace());
         
         Map<String, RealmModel> realmsById = realms.stream().collect(Collectors.toMap(RealmModel::getId, Function.identity()));
 
         DefaultModelCriteria<RoleModel> mcb = criteria();
         mcb = mcb.compare(SearchableFields.REALM_ID, Operator.IN, realmsById.keySet())
-                .compare(SearchableFields.ID, Operator.IN, compositeRoleIds.map(CompositeRoleIdentifiersModel::getRoleId));
+                .compare(SearchableFields.ID, Operator.IN, roleCompositions.map(RoleCompositionModel::getRoleId));
 
         return tx.read(withCriteria(mcb))
                 .map(entityToAdapterFunc(realmsById))

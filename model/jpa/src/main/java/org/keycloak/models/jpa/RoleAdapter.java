@@ -17,6 +17,7 @@
 
 package org.keycloak.models.jpa;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -25,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 import javax.persistence.EntityManager;
@@ -51,12 +53,22 @@ public class RoleAdapter implements RoleModel, JpaModel<RoleEntity> {
     protected EntityManager em;
     protected RealmModel realm;
     protected KeycloakSession session;
+    protected boolean detachable;
 
     public RoleAdapter(KeycloakSession session, RealmModel realm, EntityManager em, RoleEntity role) {
+        this(session, realm, em, role, false);
+    }
+
+    public RoleAdapter(KeycloakSession session, RealmModel realm, EntityManager em, RoleEntity role, Predicate<Serializable> detachCondition) {
+        this(session, realm, em, role, detachCondition.test(role.getId()));
+    }
+
+    public RoleAdapter(KeycloakSession session, RealmModel realm, EntityManager em, RoleEntity role, boolean detachable) {
         this.em = em;
         this.realm = realm;
         this.role = role;
         this.session = session;
+        this.detachable = detachable;
     }
 
     @Override
@@ -284,9 +296,8 @@ public class RoleAdapter implements RoleModel, JpaModel<RoleEntity> {
 
     @Override
     public void release() {
-        if (getEntity()==null) return;
+        if (!detachable || getEntity()==null) return;
         //HibernateSessionUtils.inspect(em);
-        //em.flush();
         em.detach(getEntity());
     }
     

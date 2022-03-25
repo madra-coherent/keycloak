@@ -59,17 +59,15 @@ import javax.ws.rs.ext.Providers;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -212,6 +210,8 @@ public class AdminConsole {
     @Produces(MediaType.APPLICATION_JSON)
     @NoCache
     public Response whoAmI(final @Context HttpHeaders headers) {
+        Instant start = Instant.now();
+        
         RealmManager realmManager = new RealmManager(session);
         AuthenticationManager.AuthResult authResult = new AppAuthManager.BearerTokenAuthenticator(session)
                 .setRealm(realm)
@@ -251,6 +251,8 @@ public class AdminConsole {
 
         Cors.add(request).allowedOrigins(authResult.getToken()).allowedMethods("GET").auth()
                 .build(response);
+
+        logger.infof("Duration: %s ms", Duration.between(start, Instant.now()).toMillis());
 
         return Response.ok(new WhoAmI(user.getId(), realm.getName(), displayName, createRealm, realmAccess, locale)).build();
     }

@@ -15,7 +15,7 @@ import org.keycloak.models.cache.infinispan.entities.CachedRole;
 
 /**
  * Implements {@link RoleModel} cache get and put operations restricted to a limited set of realms.
- * IMPORTANT: this implementation does NOT check for invalidations.
+ * This implementation does NOT check for invalidations.
  */
 public class RealmRestrictedRoleCacheOperation {
 
@@ -30,14 +30,14 @@ public class RealmRestrictedRoleCacheOperation {
         this.realmsById = realms.stream().collect(Collectors.toMap(RealmModel::getId, Function.identity()));
     }
     
-    protected Optional<RoleAdapter> getRoleAdapterFromCache(String id) {
+    protected Optional<RoleAdapter> getRoleFromCache(String id) {
         CachedRole cached = session.cache.get(id, CachedRole.class);
         if (cached == null) return Optional.empty(); 
         RealmModel realm = realmsById.get(cached.getRealm());
         if (realm == null) return Optional.empty();
         return Optional.of(new RoleAdapter(cached, session, realm));
     }
-    
+
     protected RoleAdapter addRoleToCache(RealmModel realm, RoleModel model) {
         Long loaded = session.cache.getCurrentRevision(model.getId());
         CachedRole cached;
@@ -50,23 +50,21 @@ public class RealmRestrictedRoleCacheOperation {
         return new RoleAdapter(cached, session, realm);
     }
 
-    protected RoleAdapter addManagedRole(RoleAdapter role) {
+    protected RoleModel addManagedRole(RoleAdapter role) {
         session.managedRoles.put(role.getId(), role);
         return role;
     }
     
-    public Optional<RoleAdapter> get(String id) {
-        Optional<RoleAdapter> alreadyManagedRole = Optional.ofNullable(session.managedRoles.get(id));
+    public Optional<RoleModel> get(String id) {
+        Optional<RoleModel> alreadyManagedRole = Optional.ofNullable(session.managedRoles.get(id));
         return alreadyManagedRole.isPresent() ? alreadyManagedRole
-                : getRoleAdapterFromCache(id).map(this::addManagedRole);
+                : getRoleFromCache(id).map(this::addManagedRole);
     }
 
-    public Optional<RoleAdapter> put(RoleModel role) {
-        if (role == null) return Optional.empty();
-        String realmId = role.getRealmId();
-        if (realmId == null) return Optional.empty();
-        RealmModel realm = realmsById.get(realmId);
-        if (realm == null) return Optional.empty();
+    public Optional<RoleModel> put(RoleModel role) {
+        if (role == null || role.getRealmId() == null) return Optional.ofNullable(role);
+        RealmModel realm = realmsById.get(role.getRealmId());
+        if (realm == null) return Optional.of(role);
         return Optional.of(addManagedRole(addRoleToCache(realm, role)));
     }
     

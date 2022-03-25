@@ -26,7 +26,7 @@ import org.jboss.logging.Logger;
 import static org.keycloak.common.util.StackUtil.getShortStackTrace;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.ClientScopeModel;
-import org.keycloak.models.CompositeRoleIdentifiersModel;
+import org.keycloak.models.RoleCompositionModel;
 import org.keycloak.models.GroupModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.ModelDuplicateException;
@@ -502,13 +502,13 @@ public class MapRealmProvider implements RealmProvider {
     }
 
     @Override
-    public Stream<RoleModel> getCompositeRolesByIds(Set<RealmModel> realms, Stream<CompositeRoleIdentifiersModel> compositeRoleIds) {
-        return session.roles().getCompositeRolesByIds(realms, compositeRoleIds);
+    public Stream<RoleModel> getRolesByCompositions(Set<RealmModel> realms, Stream<RoleCompositionModel> roleCompositions) {
+        return session.roles().getRolesByCompositions(realms, roleCompositions);
     }
 
     @Override
-    public Stream<CompositeRoleIdentifiersModel> getDeepCompositeRoleIdsStream(RealmModel realm, Stream<String> ids) {
-        return session.roles().getDeepCompositeRoleIdsStream(realm, ids);
+    public Stream<RoleCompositionModel> getDeepRoleCompositionsStream(RealmModel realm, Stream<String> ids) {
+        return session.roles().getDeepRoleCompositionsStream(realm, ids);
     }
     
     @Override

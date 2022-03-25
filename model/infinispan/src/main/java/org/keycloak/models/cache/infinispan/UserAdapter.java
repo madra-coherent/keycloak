@@ -18,7 +18,7 @@
 package org.keycloak.models.cache.infinispan;
 
 import org.keycloak.models.ClientModel;
-import org.keycloak.models.CompositeRoleIdentifiersModel;
+import org.keycloak.models.RoleCompositionModel;
 import org.keycloak.models.GroupModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
@@ -357,8 +357,8 @@ public class UserAdapter implements CachedUserModel.Streams {
         
         roleIds.addAll(RoleUtils.collectGroupRoleMappingIds(groups.stream()));
         
-        Stream<CompositeRoleIdentifiersModel> expandedRoleIds = keycloakSession.roles().getDeepCompositeRoleIdsStream(realm, roleIds.stream());
-        return keycloakSession.roles().getCompositeRolesByIds(Collections.singleton(realm), expandedRoleIds);
+        Stream<RoleCompositionModel> expandedRoleCompositions = keycloakSession.roles().getDeepRoleCompositionsStream(realm, roleIds.stream());
+        return keycloakSession.roles().getRolesByCompositions(Collections.singleton(realm), expandedRoleCompositions);
     }
 
     @Override

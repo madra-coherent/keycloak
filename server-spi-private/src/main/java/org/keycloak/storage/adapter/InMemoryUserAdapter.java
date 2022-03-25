@@ -19,7 +19,7 @@ package org.keycloak.storage.adapter;
 import org.keycloak.common.util.MultivaluedHashMap;
 import org.keycloak.common.util.Time;
 import org.keycloak.models.ClientModel;
-import org.keycloak.models.CompositeRoleIdentifiersModel;
+import org.keycloak.models.RoleCompositionModel;
 import org.keycloak.models.GroupModel;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.RealmModel;
@@ -30,7 +30,6 @@ import org.keycloak.models.utils.KeycloakModelUtils;
 import org.keycloak.models.utils.RoleUtils;
 import org.keycloak.storage.ReadOnlyException;
 
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -300,8 +299,8 @@ public class InMemoryUserAdapter extends UserModelDefaultMethods.Streams {
         Set<String> collectedRoleIds = new HashSet<>(roleIds);
         collectedRoleIds.addAll(roleIds);
         collectedRoleIds.addAll(RoleUtils.collectGroupRoleMappingIds(getGroupsStream()));
-        Stream<CompositeRoleIdentifiersModel> expandedRoleIds = session.roles().getDeepCompositeRoleIdsStream(realm, roleIds.stream());
-        return session.roles().getCompositeRolesByIds(Collections.singleton(realm), expandedRoleIds);
+        Stream<RoleCompositionModel> expandedRoleCompositions = session.roles().getDeepRoleCompositionsStream(realm, roleIds.stream());
+        return session.roles().getRolesByCompositions(Collections.singleton(realm), expandedRoleCompositions);
     }
 
     @Override

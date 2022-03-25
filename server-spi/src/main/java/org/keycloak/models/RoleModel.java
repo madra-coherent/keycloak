@@ -17,6 +17,7 @@
 
 package org.keycloak.models;
 
+import org.keycloak.models.resource.Releasable;
 import org.keycloak.storage.SearchableModelField;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +29,7 @@ import java.util.stream.Stream;
  * @author <a href="mailto:bill@burkecentral.com">Bill Burke</a>
  * @version $Revision: 1 $
  */
-public interface RoleModel {
+public interface RoleModel extends Releasable {
 
     public static class SearchableFields {
         public static final SearchableModelField<RoleModel> ID                  = new SearchableModelField<>("id", String.class);
@@ -120,6 +121,5 @@ public interface RoleModel {
     Stream<String> getAttributeStream(String name);
 
     Map<String, List<String>> getAttributes();
-    
-    default void release() {}
+
 }

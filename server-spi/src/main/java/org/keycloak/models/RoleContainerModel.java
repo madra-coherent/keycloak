@@ -22,6 +22,8 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
+
+import org.keycloak.models.resource.Releasable;
 import org.keycloak.provider.ProviderEvent;
 
 import java.util.List;
@@ -33,7 +35,7 @@ import java.util.stream.Stream;
  * @author <a href="mailto:bill@burkecentral.com">Bill Burke</a>
  * @version $Revision: 1 $
  */
-public interface RoleContainerModel {
+public interface RoleContainerModel extends Releasable {
 
     interface RoleRemovedEvent extends ProviderEvent {
         RoleModel getRole();

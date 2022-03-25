@@ -23,7 +23,6 @@ public class RealmCacheOperation {
     }
 
     protected Optional<RealmAdapter> getRealmFromCache(String id) {
-        if (realmCacheSession.invalidations.contains(id)) return Optional.empty();
         return Optional.ofNullable(realmCacheSession.cache.get(id, CachedRealm.class))
                 .map(cached -> new RealmAdapter(realmCacheSession.session, cached, realmCacheSession));
     }
@@ -62,13 +61,15 @@ public class RealmCacheOperation {
         return realm;
     }
 
-    public Optional<RealmAdapter> get(String id) {
-        Optional<RealmAdapter> alreadyManagedRealm = Optional.ofNullable(getManagedRealm(id));
+    public Optional<RealmModel> get(String id) {
+        if (realmCacheSession.invalidations.contains(id)) return Optional.empty();
+        Optional<RealmModel> alreadyManagedRealm = Optional.ofNullable(getManagedRealm(id));
         return alreadyManagedRealm.isPresent() ? alreadyManagedRealm
                 : getRealmFromCache(id).map(this::addManagedRealm);
     }
 
-    public Optional<RealmAdapter> put(RealmModel realm) {
+    public Optional<RealmModel> put(RealmModel realm) {
+        if (realmCacheSession.invalidations.contains(realm.getId())) return Optional.ofNullable(realm);
         return Optional.ofNullable(realm)
                 .map(this::addRealmToCache)
                 .map(this::addManagedRealm);

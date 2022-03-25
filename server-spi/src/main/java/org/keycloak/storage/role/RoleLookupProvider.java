@@ -16,13 +16,11 @@
  */
 package org.keycloak.storage.role;
 
-import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Stream;
 import org.keycloak.models.ClientModel;
-import org.keycloak.models.CompositeRoleIdentifiersModel;
+import org.keycloak.models.RoleCompositionModel;
 import org.keycloak.models.RealmModel;
 import org.keycloak.models.RoleModel;
 
@@ -68,24 +66,24 @@ public interface RoleLookupProvider {
     Stream<RoleModel> getRolesByIds(Set<RealmModel> realms, Stream<String> ids);
 
     /**
-     * Specialized exact search for multiple roles by their internal ID, with already known composite child ids
+     * Specialized exact search for multiple roles by their internal ID, with their already known composition
      * (which saves loading them from the provider again).
      * Important: no ordering is specified, so sorting must performed onto the result if appropriate 
      * @param realm Realm.
-     * @param compositeRoleIds the stream of roles identifiers, containing both their own ID and their child role IDs.
+     * @param roleCompositions the stream of role compositions, containing both their own ID and their child role IDs.
      * @return Stream of {@link RoleModel}.
      */
-    Stream<RoleModel> getCompositeRolesByIds(Set<RealmModel> realms, Stream<CompositeRoleIdentifiersModel> compositeRoleIds);
+    Stream<RoleModel> getRolesByCompositions(Set<RealmModel> realms, Stream<RoleCompositionModel> roleCompositions);
 
     /**
      * Resolves the specified role IDs with the entire set of children role IDs (expanding composites),
-     * retaining the relationship between role and its children (if any).
+     * retaining the composition relationship between role and its children (if any).
      *
      * @param realm Realm. Cannot be {@code null}.
-     * @param ids non-null Stream of composite role identifiers. Returns empty {@code Stream} when {@code null}.
-     * @return non-null Stream of {@link CompositeRoleIdentifiersModel}.
+     * @param ids non-null Stream of role compositions. Returns empty {@code Stream} when {@code null}.
+     * @return non-null Stream of {@link RoleCompositionModel}.
      */
-    Stream<CompositeRoleIdentifiersModel> getDeepCompositeRoleIdsStream(RealmModel realm, Stream<String> ids);
+    Stream<RoleCompositionModel> getDeepRoleCompositionsStream(RealmModel realm, Stream<String> ids);
     
     /**
      * Case-insensitive search for roles that contain the given string in their name or description.

@@ -3,7 +3,7 @@ package org.keycloak.models.cache.infinispan.entities;
 import java.util.Objects;
 import java.util.Set;
 
-import org.keycloak.models.CompositeRoleIdentifiersModel;
+import org.keycloak.models.RoleCompositionModel;
 import org.keycloak.models.RoleModel;
 import org.keycloak.models.utils.RoleModelDelegate;
 
@@ -14,14 +14,14 @@ public class ComposedRoleModel extends RoleModelDelegate {
     
     private final Set<String> composites;
 
-    public ComposedRoleModel(RoleModel delegate, CompositeRoleIdentifiersModel compositeIds) {
+    public ComposedRoleModel(RoleModel delegate, RoleCompositionModel roleComposition) {
         super(delegate);
-        Objects.requireNonNull(compositeIds,"Argument 'compositeIds' cannot be null");
-        if (!compositeIds.getRoleId().equals(delegate.getId())) {
-            throw new IllegalArgumentException("Argument 'compositeIds' is inconsistent with argument 'delegate'"
-                    + " (role id is " + compositeIds.getRoleId() + ", but expected " + delegate.getId() + ")");
+        Objects.requireNonNull(roleComposition,"Argument 'roleComposition' cannot be null");
+        if (!roleComposition.getRoleId().equals(delegate.getId())) {
+            throw new IllegalArgumentException("Argument 'roleComposition' is inconsistent with argument 'delegate'"
+                    + " (role id is " + roleComposition.getRoleId() + ", but expected " + delegate.getId() + ")");
         }
-        this.composites = compositeIds.getChildRoleIds();
+        this.composites = roleComposition.getChildRoleIds();
     }
 
     @Override

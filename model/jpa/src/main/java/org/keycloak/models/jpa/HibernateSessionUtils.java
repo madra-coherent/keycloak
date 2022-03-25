@@ -9,7 +9,11 @@ import java.util.stream.Stream;
 import javax.persistence.EntityManager;
 
 import org.apache.commons.lang.StringUtils;
+import org.hibernate.engine.spi.EntityKey;
+import org.hibernate.engine.spi.PersistenceContext;
+import org.hibernate.persister.entity.EntityPersister;
 import org.jboss.logging.Logger;
+
 
 public class HibernateSessionUtils {
 
@@ -47,15 +51,15 @@ public class HibernateSessionUtils {
                     );
     }
 
-    public static boolean existsInContext(EntityManager em, Serializable entityKey) {
+    public static boolean existsInContext(EntityManager em, Class<?> clazz, Serializable id) {
         org.hibernate.engine.spi.SessionImplementor hibernateSession = em.unwrap( org.hibernate.engine.spi.SessionImplementor.class );
-        org.hibernate.engine.spi.PersistenceContext pc = hibernateSession.getPersistenceContext();
-        Map.Entry<Object,org.hibernate.engine.spi.EntityEntry>[] entityEntries = pc.reentrantSafeEntityEntries();
-        return Stream.of(entityEntries)
-                .map(Map.Entry::getValue)
-                .filter(e -> e.getEntityKey().getIdentifier().equals(entityKey))
-                .findFirst()
-                .isPresent();
+//        ClassMetadata metadata = hibernateSession.getSessionFactory().getClassMetadata(clazz);
+//        EntityPersister persister = hibernateSession.getFactory().getEntityPersister(metadata.getEntityName());
+        EntityPersister persister = hibernateSession.getSessionFactory().getMetamodel().entityPersister(clazz);
+        PersistenceContext context = hibernateSession.getPersistenceContext();
+
+        EntityKey entityKey = new EntityKey(id, persister);
+        return context.containsEntity(entityKey);
     }
 
 }
