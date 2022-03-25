@@ -273,17 +273,19 @@ public class CachedRealm extends AbstractExtendableRevisioned {
         defaultLocale = model.getDefaultLocale();
         authenticationFlowList = model.getAuthenticationFlowsStream().collect(Collectors.toList());
         for (AuthenticationFlowModel flow : authenticationFlowList) {
-            this.authenticationFlows.put(flow.getId(), flow);
+            authenticationFlows.put(flow.getId(), flow);
             authenticationExecutions.put(flow.getId(), new LinkedList<>());
-            model.getAuthenticationExecutionsStream(flow.getId()).forEachOrdered(execution -> {
-                authenticationExecutions.add(flow.getId(), execution);
+        }
+        
+        model.getAuthenticationExecutionsByFlowIdsStream(authenticationFlows.keySet().stream())
+            .forEachOrdered(execution -> {
+                authenticationExecutions.add(execution.getParentFlow(), execution);
                 executionsById.put(execution.getId(), execution);
                 if (execution.getFlowId() != null) {
                     executionsByFlowId.put(execution.getFlowId(), execution);
                 }
             });
-        }
-
+            
         authenticatorConfigs = model.getAuthenticatorConfigsStream()
                 .collect(Collectors.toMap(AuthenticatorConfigModel::getId, Function.identity()));
         requiredActionProviderList = model.getRequiredActionProvidersStream().collect(Collectors.toList());

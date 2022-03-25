@@ -481,6 +481,18 @@ public interface RealmModel extends RoleContainerModel {
      */
     Stream<AuthenticationExecutionModel> getAuthenticationExecutionsStream(String flowId);
 
+    /**
+     * Returns sorted (according to priority) {@link AuthenticationExecutionModel AuthenticationExecutionModel} as a stream
+     * for multiple flow ids (bulk loading).
+     * It should be used with forEachOrdered if the ordering is required.
+     * Note that ordering is significant within each flow, not across flows. 
+     * @param flowIds the Ids of the flows to find authentication executions for.
+     * @return Sorted stream of {@link AuthenticationExecutionModel}. Never returns {@code null}.
+     */
+    default Stream<AuthenticationExecutionModel> getAuthenticationExecutionsByFlowIdsStream(Stream<String> flowIds) {
+        return flowIds.flatMap(this::getAuthenticationExecutionsStream);
+    }
+
     AuthenticationExecutionModel getAuthenticationExecutionById(String id);
     AuthenticationExecutionModel getAuthenticationExecutionByFlowId(String flowId);
     AuthenticationExecutionModel addAuthenticatorExecution(AuthenticationExecutionModel model);

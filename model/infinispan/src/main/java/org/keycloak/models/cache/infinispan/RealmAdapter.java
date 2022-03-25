@@ -19,6 +19,7 @@ package org.keycloak.models.cache.infinispan;
 
 import org.keycloak.Config;
 import org.keycloak.common.enums.SslRequired;
+import org.keycloak.common.util.MultivaluedHashMap;
 import org.keycloak.component.ComponentModel;
 import org.keycloak.models.*;
 import org.keycloak.models.cache.CachedRealmModel;
@@ -1347,7 +1348,17 @@ public class RealmAdapter implements CachedRealmModel {
     @Override
     public Stream<AuthenticationExecutionModel> getAuthenticationExecutionsStream(String flowId) {
         if (isUpdated()) return updated.getAuthenticationExecutionsStream(flowId);
-        return cached.getAuthenticationExecutions().get(flowId).stream();
+        return cached.getAuthenticationExecutions().getOrDefault(flowId, Collections.emptyList()).stream();
+    }
+    
+    @Override
+    public Stream<AuthenticationExecutionModel> getAuthenticationExecutionsByFlowIdsStream(Stream<String> flowIds) {
+        if (isUpdated()) return updated.getAuthenticationExecutionsByFlowIdsStream(flowIds);
+        MultivaluedHashMap<String, AuthenticationExecutionModel> execsByFlowId =  cached.getAuthenticationExecutions();
+        return flowIds.map(execsByFlowId::get)
+                .filter(Objects::nonNull)
+                .flatMap(Collection::stream)
+                ;
     }
 
     @Override

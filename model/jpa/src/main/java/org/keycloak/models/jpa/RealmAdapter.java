@@ -1668,19 +1668,49 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
         return model;
     }
 
+    private JpaDetachCondition getDetachAuthenticationFlowsCondition(Collection<String> authenticationFlowIds) {
+        return new JpaDetachCondition(authenticationFlowIds, new HibernateContextAbsencePredicate(AuthenticationFlowEntity.class, em));
+    }
+
     @Override
     public Stream<AuthenticationExecutionModel> getAuthenticationExecutionsStream(String flowId) {
+        JpaDetachCondition detachCondition = getDetachAuthenticationFlowsCondition(Collections.singleton(flowId));
         AuthenticationFlowEntity flow = em.getReference(AuthenticationFlowEntity.class, flowId);
 
-        //HibernateSessionUtils.inspect(em);
         List<AuthenticationExecutionModel> result = flow.getExecutions().stream()
                 .filter(e -> getId().equals(e.getRealm().getId()))
                 .map(this::entityToModel)
                 .sorted(AuthenticationExecutionModel.ExecutionComparator.SINGLETON)
                 .collect(Collectors.toList());
-        em.flush();
-        em.detach(flow);
+
+        if (detachCondition.test(flow.getId())) {
+            em.detach(flow);
+        }
+        
         return result.stream();
+    }
+
+    @Override
+    public Stream<AuthenticationExecutionModel> getAuthenticationExecutionsByFlowIdsStream(Stream<String> flowIds) {
+        Collection<String> ids = flowIds.collect(Collectors.toSet());
+        
+        // Collect the authentication execution ids so we can compute the JPA detach condition for each of them
+        TypedQuery<String> queryExecutionIds = em.createNamedQuery("authenticationFlowExecutionIdsInFlowList", String.class)
+                .setParameter("flowIds", ids)
+                .setParameter("realmId", getId());
+        JpaDetachCondition detachCondition = getDetachAuthenticationFlowsCondition(queryExecutionIds.getResultList());
+
+        TypedQuery<AuthenticationExecutionEntity> query = em.createNamedQuery("authenticationFlowExecutionsInFlowList", AuthenticationExecutionEntity.class)
+                .setParameter("flowIds", ids)
+                .setParameter("realmId", getId());
+        
+        return closing(query.getResultStream()
+                        .map(exec -> {
+                                try { return entityToModel(exec); }
+                                finally { if (detachCondition.test(exec.getId())) em.detach(exec); }
+                            })
+                        .sorted(AuthenticationExecutionModel.ExecutionComparator.SINGLETON)
+                        );
     }
 
     public AuthenticationExecutionModel entityToModel(AuthenticationExecutionEntity entity) {
@@ -1690,7 +1720,7 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
         model.setPriority(entity.getPriority());
         model.setAuthenticator(entity.getAuthenticator());
         model.setFlowId(entity.getFlowId());
-        model.setParentFlow(entity.getParentFlow().getId());
+        model.setParentFlow(entity.getParentFlowId());
         model.setAuthenticatorFlow(entity.isAutheticatorFlow());
         model.setAuthenticatorConfig(entity.getAuthenticatorConfig());
         return model;

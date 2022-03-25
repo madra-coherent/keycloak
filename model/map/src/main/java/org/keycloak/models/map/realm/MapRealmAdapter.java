@@ -715,6 +715,15 @@ public class MapRealmAdapter extends AbstractRealmModel<MapRealmEntity> implemen
                 .map(MapAuthenticationExecutionEntity::toModel)
                 .sorted(AuthenticationExecutionModel.ExecutionComparator.SINGLETON);
     }
+    
+    @Override
+    public Stream<AuthenticationExecutionModel> getAuthenticationExecutionsByFlowIdsStream(Stream<String> flowIds) {
+        Set<String> ids = flowIds.collect(Collectors.toSet());
+        return entity.getAuthenticationExecutions()
+                .filter(execution -> ids.contains(execution.getParentFlowId()))
+                .map(MapAuthenticationExecutionEntity::toModel)
+                .sorted(AuthenticationExecutionModel.ExecutionComparator.SINGLETON);
+    }
 
     @Override
     public AuthenticationExecutionModel getAuthenticationExecutionById(String id) {

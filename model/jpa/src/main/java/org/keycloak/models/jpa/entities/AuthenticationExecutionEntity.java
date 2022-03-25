@@ -36,7 +36,11 @@ import javax.persistence.Table;
  * @version $Revision: 1 $
  */
 @NamedQueries({
-        @NamedQuery(name = "authenticationFlowExecution", query = "select authExec from AuthenticationExecutionEntity authExec where authExec.flowId = :flowId")
+        @NamedQuery(name = "authenticationFlowExecution", query = "select authExec from AuthenticationExecutionEntity authExec where authExec.flowId = :flowId"),
+        @NamedQuery(name = "authenticationFlowExecutionIdsInFlowList",
+            query = "select authExec.id from AuthenticationExecutionEntity authExec where authExec.parentFlowId in :flowIds and authExec.realmId = :realmId"),
+        @NamedQuery(name = "authenticationFlowExecutionsInFlowList",
+            query = "select authExec from AuthenticationExecutionEntity authExec where authExec.parentFlowId in :flowIds and authExec.realmId = :realmId")
 })
 @Table(name="AUTHENTICATION_EXECUTION")
 @Entity
@@ -46,9 +50,23 @@ public class AuthenticationExecutionEntity {
     @Access(AccessType.PROPERTY) // we do this because relationships often fetch id, but not entity.  This avoids an extra SQL
     protected String id;
 
+    /**
+     * Used for named-querying by realm id and expose this information without triggering the {@link RealmEntity} load.
+     * This information is read-only, as described by the attributes {@link Column#insertable()} and {@link Column#updatable()} below
+     */
+    @Column(name = "REALM_ID", insertable = false, updatable = false)
+    protected String realmId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "REALM_ID")
     protected RealmEntity realm;
+
+    /**
+     * Used for named-querying by parent flow id and expose this information without triggering the {@link AuthenticationFlowEntity} load.
+     * This information is read-only, as described by the attributes {@link Column#insertable()} and {@link Column#updatable()} below
+     */
+    @Column(name = "FLOW_ID", insertable = false, updatable = false)
+    protected String parentFlowId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "FLOW_ID")
@@ -80,12 +98,21 @@ public class AuthenticationExecutionEntity {
         this.id = id;
     }
 
+    public String getRealmId() {
+        return realmId;
+    }
+
     public RealmEntity getRealm() {
         return realm;
     }
 
     public void setRealm(RealmEntity realm) {
         this.realm = realm;
+        // Keep the in-memory attribute realmId consistent with the specified realm
+        // (but won't be used for persistence)
+        if (realm!=null) {
+            realmId = realm.getId();
+        }
     }
 
     public String getAuthenticator() {
@@ -120,12 +147,21 @@ public class AuthenticationExecutionEntity {
         this.autheticatorFlow = autheticatorFlow;
     }
 
+    public String getParentFlowId() {
+        return parentFlowId;
+    }
+
     public AuthenticationFlowEntity getParentFlow() {
         return parentFlow;
     }
 
     public void setParentFlow(AuthenticationFlowEntity flow) {
         this.parentFlow = flow;
+        // Keep the in-memory attribute parentFlowId consistent with the specified flow
+        // (but won't be used for persistence)
+        if (flow!=null) {
+            parentFlowId = flow.getId();
+        }
     }
 
     public String getFlowId() {
