@@ -17,6 +17,8 @@
 package org.keycloak.testsuite.federation;
 
 import java.util.Map;
+import java.util.Set;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Stream;
 import org.jboss.logging.Logger;
@@ -107,6 +109,11 @@ public class HardcodedRoleStorageProvider implements RoleStorageProvider {
         public String getDescription() {
             return "Federated Role";
         }
+        
+        @Override
+        public String getRealmId() {
+            return realm.getId();
+        }
 
         @Override
         public boolean isComposite() {
@@ -116,6 +123,11 @@ public class HardcodedRoleStorageProvider implements RoleStorageProvider {
         @Override
         public Stream<RoleModel> getCompositesStream(String search, Integer first, Integer max) {
             return Stream.empty();
+        }
+        
+        @Override
+        public Set<String> getCompositeRoleIds() {
+            return Collections.emptySet();
         }
 
         @Override
@@ -187,6 +199,7 @@ public class HardcodedRoleStorageProvider implements RoleStorageProvider {
         public void removeAttribute(String name) {
             throw new ReadOnlyException("role is read only");
         }
+
     }
 
 
