@@ -83,6 +83,7 @@ import org.keycloak.util.TokenUtil;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -577,7 +578,7 @@ public class TokenManager {
     }
 
 
-    public static Set<RoleModel> getAccess(UserModel user, ClientModel client, Stream<ClientScopeModel> clientScopes) {
+    public static Set<RoleModel> getAccess(UserModel user, ClientModel client, Stream<ClientScopeModel> clientScopes, KeycloakSession keycloakSession) {
         Set<RoleModel> roleMappings = user.getDeepRoleMappingsStream().collect(Collectors.toSet());
 
         if (client.isFullScopeAllowed()) {
@@ -604,7 +605,9 @@ public class TokenManager {
             scopeMappings = Stream.concat(scopeMappings, clientScopesMappings);
 
             // 3 - Expand scope mappings
-            scopeMappings = RoleUtils.expandCompositeRolesStream(scopeMappings);
+            scopeMappings = keycloakSession.roles().getRolesByCompositions(Collections.singleton(client.getRealm()),
+                    keycloakSession.roles().getDeepRoleCompositionsStream(client.getRealm(), scopeMappings.map(RoleModel::getId)))
+                    ;
 
             // Intersection of expanded user roles and expanded scopeMappings
             roleMappings.retainAll(scopeMappings.collect(Collectors.toSet()));

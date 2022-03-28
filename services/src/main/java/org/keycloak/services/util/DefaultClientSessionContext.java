@@ -35,10 +35,10 @@ import org.keycloak.models.ClientScopeModel;
 import org.keycloak.models.ClientSessionContext;
 import org.keycloak.models.KeycloakSession;
 import org.keycloak.models.ProtocolMapperModel;
+import org.keycloak.models.RoleCompositionModel;
 import org.keycloak.models.RoleModel;
 import org.keycloak.models.UserModel;
 import org.keycloak.models.utils.KeycloakModelUtils;
-import org.keycloak.models.utils.RoleUtils;
 import org.keycloak.protocol.ProtocolMapperUtils;
 import org.keycloak.protocol.oidc.OIDCLoginProtocol;
 import org.keycloak.protocol.oidc.TokenManager;
@@ -243,26 +243,25 @@ public class DefaultClientSessionContext implements ClientSessionContext {
             return true;
         }
 
-        Set<RoleModel> clientScopeRoles = clientScope.getScopeMappingsStream().collect(Collectors.toSet());
+        Set<String> clientScopeRoleIds = clientScope.getScopeMappingsStream().map(RoleModel::getId).collect(Collectors.toSet());
 
         // Client scope is automatically permitted if it doesn't have any role scope mappings
-        if (clientScopeRoles.isEmpty()) {
+        if (clientScopeRoleIds.isEmpty()) {
             return true;
         }
 
-        // Expand (resolve composite roles)
-        clientScopeRoles = RoleUtils.expandCompositeRoles(clientScopeRoles);
-
-        // Check if expanded roles of clientScope has any intersection with expanded roles of user. If not, it is not permitted
-        clientScopeRoles.retainAll(getUserRoles());
-        return !clientScopeRoles.isEmpty();
+        // Expand (deep role composition resolution), and check if expanded roles of clientScope
+        // has any intersection with expanded roles of user. If not, it is not permitted 
+        return session.roles().getDeepRoleCompositionsStream(clientScope.getRealm(), clientScopeRoleIds.stream())
+            .map(RoleCompositionModel::getRoleId)
+            .anyMatch(clientScopeRoleIds::contains);
     }
 
 
     private Set<RoleModel> loadRoles() {
         UserModel user = clientSession.getUserSession().getUser();
         ClientModel client = clientSession.getClient();
-        return TokenManager.getAccess(user, client, getClientScopesStream());
+        return TokenManager.getAccess(user, client, getClientScopesStream(), session);
     }
 
 

@@ -188,39 +188,12 @@ public class RoleUtils {
         return sb.build();
     }
 
-    /**
-     * @param roles
-     * @return new set with composite roles expanded
-     */
-//    public static Set<RoleModel> expandCompositeRoles(Set<RoleModel> roles) {
-//        System.out.println(">>>>> expandCompositeRoles: " + roles);
-//        Set<RoleModel> visited = new HashSet<>();
-//
-//        return Stream.of(
-//                // The provided roles themselves
-//                roles.stream(),
-//                // And their composition
-//                roles.stream().flatMap(RoleModel::getDeepCompositesStream)
-//                )
-//                .flatMap(Function.identity())
-//                .collect(Collectors.toSet());
-//    }
-
     public static Set<RoleModel> expandCompositeRoles(Set<RoleModel> roles) {
         Set<RoleModel> visited = new HashSet<>();
 
         return roles.stream()
                 .flatMap(roleModel -> RoleUtils.expandCompositeRolesStream(roleModel, visited))
                 .collect(Collectors.toSet());
-    }
-    /**
-     * @param roles
-     * @return stream with composite roles expanded
-     */
-    public static Stream<RoleModel> expandCompositeRolesStream(Stream<RoleModel> roles) {
-        Set<RoleModel> visited = new HashSet<>();
-
-        return roles.flatMap(roleModel -> RoleUtils.expandCompositeRolesStream(roleModel, visited));
     }
 
     /**
