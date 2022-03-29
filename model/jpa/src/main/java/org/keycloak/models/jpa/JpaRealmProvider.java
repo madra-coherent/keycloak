@@ -363,7 +363,7 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
         TypedQuery<String> query = em.createNamedQuery("getClientRoleIds", String.class);
         query.setParameter("client", client.getId());
 
-        return session.roles().getRolesByIds(client.getRealm(), closing(query.getResultStream()));
+        return session.roles().getRolesByIds(client.getRealm(), closing(paginateQuery(query, first, max).getResultStream()));
     }
 
     protected Stream<RoleModel> getRolesStream(TypedQuery<RoleEntity> query, RealmModel realm, Integer first, Integer max) {
