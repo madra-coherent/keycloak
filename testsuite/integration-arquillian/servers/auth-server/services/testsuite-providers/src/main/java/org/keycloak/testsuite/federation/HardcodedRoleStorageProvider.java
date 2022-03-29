@@ -24,6 +24,7 @@ import java.util.stream.Stream;
 import org.jboss.logging.Logger;
 import org.keycloak.models.ClientModel;
 import org.keycloak.models.RealmModel;
+import org.keycloak.models.RoleCompositionModel;
 import org.keycloak.models.RoleContainerModel;
 import org.keycloak.models.RoleModel;
 import org.keycloak.storage.ReadOnlyException;
@@ -60,6 +61,15 @@ public class HardcodedRoleStorageProvider implements RoleStorageProvider {
     }
 
     @Override
+    public Stream<RoleModel> getRolesByIds(Set<RealmModel> realms, Stream<String> ids) {
+        if (realms==null || realms.isEmpty()) return Stream.empty();
+        return ids.map(StorageId::new)
+                .map(StorageId::getExternalId)
+                .filter(roleName::equals)
+                .map(e -> new HardcodedRoleAdapter(realms.iterator().next()));
+    }
+
+    @Override
     public Stream<RoleModel> searchForRolesStream(RealmModel realm, String search, Integer first, Integer max) {
         if (Boolean.parseBoolean(component.getConfig().getFirst(HardcodedRoleStorageProviderFactory.DELAYED_SEARCH))) try {
             Thread.sleep(5000l);
@@ -81,6 +91,21 @@ public class HardcodedRoleStorageProvider implements RoleStorageProvider {
     @Override
     public Stream<RoleModel> searchForClientRolesStream(ClientModel client, String search, Integer first, Integer max) {
         throw new UnsupportedOperationException("Not supported yet.");
+    }
+    
+    @Override
+    public Stream<RoleCompositionModel> getDeepRoleCompositionsStream(RealmModel realm, Stream<String> ids) {
+        return ids.map(StorageId::new)
+                .map(StorageId::getExternalId)
+                .filter(roleName::equals)
+                .map(id -> new RoleCompositionModel(new HardcodedRoleAdapter(realm).getId(), Collections.emptySet()));
+    }
+
+    @Override
+    public Stream<RoleModel> getRolesByCompositions(Set<RealmModel> realms,
+            Stream<RoleCompositionModel> roleCompositions) {
+        // TODO Auto-generated method stub
+        return null;
     }
 
     public class HardcodedRoleAdapter implements RoleModel {
@@ -201,6 +226,5 @@ public class HardcodedRoleStorageProvider implements RoleStorageProvider {
         }
 
     }
-
 
 }
