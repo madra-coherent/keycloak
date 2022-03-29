@@ -17,6 +17,7 @@
 
 package org.keycloak.models;
 
+import org.keycloak.models.utils.RoleUtils;
 import org.keycloak.provider.ProviderEvent;
 
 import org.keycloak.storage.SearchableModelField;
@@ -219,10 +220,18 @@ public interface UserModel extends RoleMapperModel {
 
     /**
      * Returns stream of all roles including composites that are directly set to this object.
+     * Default implementation performs a recursive traversal, which may be implemented in
+     * a more efficient way by providers.
      * @return Stream of {@link RoleModel}. Never returns {@code null}.
      */
-    Stream<RoleModel> getDeepRoleMappingsStream();
-
+    default Stream<RoleModel> getDeepRoleMappingsStream() {
+        Set<RoleModel> roles = Stream.concat(
+                getRoleMappingsStream(),
+                RoleUtils.collectGroupRoleMappings(getGroupsStream()).stream()
+                )
+                .collect(Collectors.toSet());
+        return RoleUtils.expandCompositeRoles(roles).stream();
+    }
 
     /**
      * @deprecated Use {@link #getGroupsStream() getGroupsStream} instead.

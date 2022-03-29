@@ -201,6 +201,23 @@ public class RoleUtils {
      * @param groups the groups to collect role IDs for 
      * @return the collected set of role IDs
      */
+    public static Set<RoleModel> collectGroupRoleMappings(Stream<GroupModel> groups) {
+        Set<RoleModel> roles = new HashSet<>();
+        groups.forEach(group -> collectGroupRoles(group, roles));
+        return roles;
+    }
+
+    private static void collectGroupRoles(GroupModel group, Set<RoleModel> roles) {
+        roles.addAll(group.getRoleMappingsStream().collect(Collectors.toList()));
+        if (group.getParentId() == null) return;
+        collectGroupRoles(group.getParent(), roles);
+    }
+
+    /**
+     * Collects all the roles IDs attached to the specified groups and their ascendants
+     * @param groups the groups to collect role IDs for 
+     * @return the collected set of role IDs
+     */
     public static Set<String> collectGroupRoleMappingIds(Stream<GroupModel> groups) {
         Set<String> roleIds = new HashSet<>();
         groups.forEach(group -> collectGroupRoleIds(group, roleIds));
