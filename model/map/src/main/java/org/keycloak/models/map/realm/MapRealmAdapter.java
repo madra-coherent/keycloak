@@ -1325,17 +1325,17 @@ public class MapRealmAdapter extends AbstractRealmModel<MapRealmEntity> implemen
     }
 
     @Override
-    public Stream<String> getDefaultClientScopeIdsStream() {
-        return entity.getDefaultClientScopeIds();
+    public Stream<String> getDefaultClientScopeIdsStream(boolean defaultScope) {
+        if (defaultScope) {
+            return entity.getDefaultClientScopeIds();
+        } else {
+            return entity.getOptionalClientScopeIds();
+        }
     }
 
     @Override
     public Stream<ClientScopeModel> getDefaultClientScopesStream(boolean defaultScope) {
-        if (defaultScope) {
-            return entity.getDefaultClientScopeIds().map(this::getClientScopeById);
-        } else {
-            return entity.getOptionalClientScopeIds().map(this::getClientScopeById);
-        }
+        return getDefaultClientScopeIdsStream(defaultScope).map(this::getClientScopeById);
     }
 
     @Override

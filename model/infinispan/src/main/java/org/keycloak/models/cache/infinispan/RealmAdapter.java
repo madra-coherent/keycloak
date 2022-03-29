@@ -1573,9 +1573,9 @@ public class RealmAdapter implements CachedRealmModel {
     }
 
     @Override
-    public Stream<String> getDefaultClientScopeIdsStream() {
-        if (isUpdated()) return updated.getDefaultClientScopeIdsStream();
-        return cached.getDefaultDefaultClientScopes().stream();
+    public Stream<String> getDefaultClientScopeIdsStream(boolean defaultScope) {
+        if (isUpdated()) return updated.getDefaultClientScopeIdsStream(defaultScope);
+        return defaultScope ? cached.getDefaultDefaultClientScopes().stream() : cached.getOptionalDefaultClientScopes().stream();
     }
 
     @Override

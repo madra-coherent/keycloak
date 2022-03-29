@@ -1038,10 +1038,12 @@ public interface RealmModel extends RoleContainerModel {
     }
 
     /**
-     * Returns default client scopes of this realm.
+     * Returns IDs of default client scopes of this realm either default ones or optional ones.
+     * @param defaultScope if {@code true} default client scopes are returned, 
+     * if {@code false} optional client scopes are returned.
      * @return Stream of client scope IDs. Never returns {@code null}.
      */
-    Stream<String> getDefaultClientScopeIdsStream();
+    Stream<String> getDefaultClientScopeIdsStream(boolean defaultScope);
 
     /**
      * Returns default client scopes of this realm either default ones or optional ones.

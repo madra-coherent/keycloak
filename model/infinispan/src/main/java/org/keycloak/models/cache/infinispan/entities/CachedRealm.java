@@ -322,13 +322,9 @@ public class CachedRealm extends AbstractExtendableRevisioned {
     protected static final Logger logger = Logger.getLogger(CachedRealm.class);
             
     protected void cacheClientScopes(RealmModel model) {
-        Instant start = Instant.now();
         clientScopes = model.getClientScopeIdsStream().collect(Collectors.toList());
-        //logger.infof("Collected %d client scopes in %d ms for realm  %s", clientScopes.size(), Duration.between(start, Instant.now()).toMillis(), model.getName());
-        defaultDefaultClientScopes = model.getDefaultClientScopeIdsStream().collect(Collectors.toList());
-        Set<String> defaultScopes = new HashSet<>(defaultDefaultClientScopes);
-        optionalDefaultClientScopes = clientScopes.stream().filter(scope -> !defaultScopes.contains(scope)).collect(Collectors.toList());
-        //logger.infof("   Total: %d ms for realm  %s", Duration.between(start, Instant.now()).toMillis(), model.getName());
+        defaultDefaultClientScopes = model.getDefaultClientScopeIdsStream(true).collect(Collectors.toList());
+        optionalDefaultClientScopes = model.getDefaultClientScopeIdsStream(false).collect(Collectors.toList());
     }
 
     public String getMasterAdminClient() {

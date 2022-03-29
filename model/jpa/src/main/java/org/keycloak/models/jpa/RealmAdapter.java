@@ -2074,16 +2074,16 @@ public class RealmAdapter implements RealmModel, JpaModel<RealmEntity> {
     }
 
     @Override
-    public Stream<String> getDefaultClientScopeIdsStream() {
+    public Stream<String> getDefaultClientScopeIdsStream(boolean defaultScope) {
         TypedQuery<String> query = em.createNamedQuery("defaultClientScopeRealmMappingIdsByRealm", String.class);
         query.setParameter("realm", getEntity());
-        query.setParameter("defaultScope", true);
+        query.setParameter("defaultScope", defaultScope);
         return closing(query.getResultStream());
     }
     
     @Override
     public Stream<ClientScopeModel> getDefaultClientScopesStream(boolean defaultScope) {
-        return getDefaultClientScopeIdsStream().map(this::getClientScopeById).filter(Objects::nonNull);
+        return getDefaultClientScopeIdsStream(defaultScope).map(this::getClientScopeById).filter(Objects::nonNull);
     }
 
     @Override
