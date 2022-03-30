@@ -59,8 +59,6 @@ import javax.ws.rs.ext.Providers;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -210,8 +208,6 @@ public class AdminConsole {
     @Produces(MediaType.APPLICATION_JSON)
     @NoCache
     public Response whoAmI(final @Context HttpHeaders headers) {
-        Instant start = Instant.now();
-        
         RealmManager realmManager = new RealmManager(session);
         AuthenticationManager.AuthResult authResult = new AppAuthManager.BearerTokenAuthenticator(session)
                 .setRealm(realm)
@@ -252,8 +248,6 @@ public class AdminConsole {
         Cors.add(request).allowedOrigins(authResult.getToken()).allowedMethods("GET").auth()
                 .build(response);
 
-        logger.infof("Duration: %s ms", Duration.between(start, Instant.now()).toMillis());
-
         return Response.ok(new WhoAmI(user.getId(), realm.getName(), displayName, createRealm, realmAccess, locale)).build();
     }
 
@@ -265,10 +259,7 @@ public class AdminConsole {
      * @return the map of <realm name, set of role names)
      */
     private Map<String, Set<String>> getPerRealmAccess(Stream<RealmModel> realms, UserModel user, Function<RealmModel,ClientModel> realmAdminClientSupplier) {
-        logger.infof("Collecting realms");
         Collection<RealmModel> collectedRealms = realms.collect(Collectors.toList());
-        
-        logger.infof("Collecting clients for %d realms", collectedRealms.size());
 
         // Cannot rely of the roles' realmid as all realm admin roles are detained by the master realm
         // Maintains the mapping between the client id and the realm it's related to
@@ -282,14 +273,12 @@ public class AdminConsole {
             }
         });
         
-        logger.infof("Collecting user admin roles for %d clients", realmAdminClients.size());
         Map<String, Set<String>> result = session.roles().getClientsRolesStream(realmAdminClients.stream())
                 .filter(user::hasRole)
                 .collect(Collectors.groupingBy(
                         role -> realmsByAdminClientId.get(role.getContainerId()).getName(),
                         Collectors.mapping(RoleModel::getName, Collectors.toSet())
                         ));
-        logger.infof("Collected %d user admin roles", result.values().size());
         
         return result;
     }
