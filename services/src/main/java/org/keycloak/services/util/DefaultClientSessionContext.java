@@ -250,11 +250,12 @@ public class DefaultClientSessionContext implements ClientSessionContext {
             return true;
         }
 
-        // Expand (deep role composition resolution), and check if expanded roles of clientScope
-        // has any intersection with expanded roles of user. If not, it is not permitted 
+        // Expand client scope roles (deep role composition resolution), and check if expanded roles
+        // has any intersection with expanded roles of user. If not, it is not permitted
+        Set<String> userRoleIds = getUserRoles().stream().map(RoleModel::getId).collect(Collectors.toSet());
         return session.roles().getDeepRoleCompositionsStream(clientScope.getRealm(), clientScopeRoleIds.stream())
             .map(RoleCompositionModel::getRoleId)
-            .anyMatch(clientScopeRoleIds::contains);
+            .anyMatch(userRoleIds::contains);
     }
 
 
