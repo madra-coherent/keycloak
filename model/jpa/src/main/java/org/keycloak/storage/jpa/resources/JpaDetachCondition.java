@@ -13,8 +13,8 @@ import java.util.stream.Collectors;
  * 
  * Used to detect which entities may be released after performing a JPA operation: the JPA operation may load
  * entities either from the persistence unit (database) or from the persistence context cache,
- * in which case releasing them may created side effect (loosing uncommited changes, or core already detaining
- * a reference to such an entity later throwing exception before detached in the meanwhile.
+ * in which case releasing them may create side effect (loosing uncommitted changes, or code already detaining
+ * a reference onto such an entity later throwing exception because it was detached in the meanwhile).
  * Building such an instance prior to executing the JPA operation captures this information for a conditional
  * detach/evict after the operation was performed.
  */
