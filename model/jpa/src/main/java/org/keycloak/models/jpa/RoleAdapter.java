@@ -297,7 +297,6 @@ public class RoleAdapter implements RoleModel, JpaModel<RoleEntity> {
     @Override
     public void release() {
         if (!detachable || getEntity()==null) return;
-        //HibernateSessionUtils.inspect(em);
         em.detach(getEntity());
     }
     
