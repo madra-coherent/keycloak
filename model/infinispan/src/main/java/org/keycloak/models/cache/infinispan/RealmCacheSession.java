@@ -961,17 +961,20 @@ public class RealmCacheSession implements CacheRealmProvider {
     }
     
     @Override
-    public Stream<RoleCompositionModel> getDeepRoleCompositionsStream(RealmModel realm, Stream<String> ids) {
+    public Stream<RoleCompositionModel> getDeepRoleCompositionsStream(RealmModel realm, Stream<String> ids, Set<String> excludedIds) {
         if (ids == null) return Stream.empty();
+        Set<String> alreadyVisitedRolesIds = new HashSet<>(Optional.ofNullable(excludedIds).orElse(new HashSet<>()));
 
         Set<RoleCompositionModel> collectedRoleCompositions = new HashSet<>();
         Set<String> roleIdsMissingFromCache = new HashSet<>();
 
         // First, scan the cached roles deeply to collect children
         RealmRestrictedRoleCacheOperation cacheOp = new RealmRestrictedRoleCacheOperation(this, Collections.singleton(realm));
-        ids.forEach(roleId -> visitAndCollectChildRoles(roleId, cacheOp, new HashSet<>(), collectedRoleCompositions, roleIdsMissingFromCache));
+        ids.forEach(roleId -> visitAndCollectChildRoles(roleId, cacheOp, alreadyVisitedRolesIds, collectedRoleCompositions, roleIdsMissingFromCache));
         // Then expand role ids which cannot be retrieved from cache using delegate
-        collectedRoleCompositions.addAll(getRoleDelegate().getDeepRoleCompositionsStream(realm, roleIdsMissingFromCache.stream()).collect(Collectors.toList()));
+        collectedRoleCompositions.addAll(
+                getRoleDelegate().getDeepRoleCompositionsStream(realm, roleIdsMissingFromCache.stream(), alreadyVisitedRolesIds)
+                .collect(Collectors.toList()));
         
         return collectedRoleCompositions.stream();
     }

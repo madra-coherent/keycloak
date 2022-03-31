@@ -21,15 +21,18 @@ import static org.keycloak.common.util.StackUtil.getShortStackTrace;
 import static org.keycloak.models.jpa.PaginationUtils.paginateQuery;
 import static org.keycloak.utils.StreamsUtil.closing;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -512,42 +515,62 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
     }
 
     @Override
-    public Stream<RoleCompositionModel> getDeepRoleCompositionsStream(RealmModel realm, Stream<String> ids) {
+    public Stream<RoleCompositionModel> getDeepRoleCompositionsStream(RealmModel realm, Stream<String> ids, Set<String> excludedIds) {
         if (ids == null) return Stream.empty();
 
         Collection<RoleCompositionModel> collectedRoleCompositions = new LinkedList<>();
-        Set<String> roleIdsToCollectChildRoleIdsFrom = ids.collect(Collectors.toSet());
-        Set<String> alreadyVisitedRolesIds = new HashSet<>();
+        Deque<String> roleIdsToCollectChildRoleIdsFor = new ArrayDeque<>(ids.collect(Collectors.toSet()));
+        Set<String> alreadyVisitedRolesIds = new HashSet<>(Optional.ofNullable(excludedIds).orElse(Collections.emptySet()));
         
-        while (!roleIdsToCollectChildRoleIdsFrom.isEmpty()) {
-            List<CompositeRoleEntity> compositeRolesEntities = em.createNamedQuery("getCompositeRolesByCompositeIds", CompositeRoleEntity.class)
-                    .setParameter("roleIds", roleIdsToCollectChildRoleIdsFrom)
-                    .getResultList(); 
-
-            // Group all composite child role ids by their composite role id
-            Map<String, Set<String>> roleCompositions = compositeRolesEntities.stream()
-                    .collect(Collectors.groupingBy(CompositeRoleEntity::getCompositeId,
-                            Collectors.mapping(CompositeRoleEntity::getChildRoleId, Collectors.toSet())));
+        int i = 0;
+        while (!roleIdsToCollectChildRoleIdsFor.isEmpty()) {
+            // Limit the number of IN clauses (Oracle limit is 1000) and Hibernate 5.2.18+ generates a number of values as a power of 2
+            // to optimize query statement caches, see https://hibernate.atlassian.net/browse/HHH-12469
+            Collection<String> batchOfRoleIds = pullNextBatchOfItems(roleIdsToCollectChildRoleIdsFor, 512);
             
-            // Ensure that role ids having no children (therefore not in the result set above) are also collected
-            collectedRoleCompositions.addAll(roleIdsToCollectChildRoleIdsFrom.stream()
-                    .map(roleId -> new RoleCompositionModel(roleId, roleCompositions.getOrDefault(roleId, Collections.emptySet())))
-                    .collect(Collectors.toList())
-                    );
-            
-            alreadyVisitedRolesIds.addAll(roleIdsToCollectChildRoleIdsFrom);
+            List<CompositeRoleEntity> compositeRolesEntities = getRoleCompositionsFromDatabase(batchOfRoleIds);
 
-            roleIdsToCollectChildRoleIdsFrom = compositeRolesEntities.stream()
+            collectedRoleCompositions.addAll(toRoleCompositions(batchOfRoleIds, compositeRolesEntities));
+            
+            alreadyVisitedRolesIds.addAll(batchOfRoleIds);
+
+            roleIdsToCollectChildRoleIdsFor.addAll(compositeRolesEntities.stream()
                     .map(CompositeRoleEntity::getChildRoleId)
-                    // Remove already visited roles ids
                     .filter(roleId -> !alreadyVisitedRolesIds.contains(roleId))
-                    .collect(Collectors.toSet());
+                    .collect(Collectors.toSet()));
 
             // Detach CompositeRoleEntities as they are not used any more (less entities to manage into the JPA context)
             compositeRolesEntities.forEach(em::detach);
         }
         
         return collectedRoleCompositions.stream();
+    }
+    
+    private <T> Collection<T> pullNextBatchOfItems(Deque<T> items, int maxNbOfItems) {
+        int nbOfItemsToPull = Math.min(items.size(), maxNbOfItems);
+        List<T> pulledItems = new ArrayList<>(nbOfItemsToPull);
+        for (int itemIndex=0; itemIndex < nbOfItemsToPull; itemIndex++) {
+            pulledItems.add(items.remove());
+        }
+        return pulledItems;
+    }
+    
+    private List<CompositeRoleEntity> getRoleCompositionsFromDatabase(Collection<String> roleIds) {
+        return em.createNamedQuery("getCompositeRolesByCompositeIds", CompositeRoleEntity.class)
+                .setParameter("roleIds", roleIds)
+                .getResultList(); 
+    }
+    
+    private List<RoleCompositionModel> toRoleCompositions(Collection<String> queriedRoleIds, List<CompositeRoleEntity> compositeRolesEntities) {
+        // Group all composite child role ids by their composite role id
+        Map<String, Set<String>> roleCompositions = compositeRolesEntities.stream()
+                .collect(Collectors.groupingBy(CompositeRoleEntity::getCompositeId,
+                        Collectors.mapping(CompositeRoleEntity::getChildRoleId, Collectors.toSet())));
+        
+        // Ensure that role ids having no child (therefore not in the result set above) are also collected
+        return queriedRoleIds.stream()
+                .map(roleId -> new RoleCompositionModel(roleId, roleCompositions.getOrDefault(roleId, Collections.emptySet())))
+                .collect(Collectors.toList());
     }
 
     @Override

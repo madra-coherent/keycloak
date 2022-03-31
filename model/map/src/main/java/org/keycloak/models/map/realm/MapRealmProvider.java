@@ -507,8 +507,8 @@ public class MapRealmProvider implements RealmProvider {
     }
 
     @Override
-    public Stream<RoleCompositionModel> getDeepRoleCompositionsStream(RealmModel realm, Stream<String> ids) {
-        return session.roles().getDeepRoleCompositionsStream(realm, ids);
+    public Stream<RoleCompositionModel> getDeepRoleCompositionsStream(RealmModel realm, Stream<String> ids, Set<String> excludedIds) {
+        return session.roles().getDeepRoleCompositionsStream(realm, ids, excludedIds);
     }
     
     @Override

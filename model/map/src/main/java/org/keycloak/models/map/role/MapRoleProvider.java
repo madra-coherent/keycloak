@@ -121,14 +121,14 @@ public class MapRoleProvider implements RoleProvider {
     }
     
     @Override
-    public Stream<RoleCompositionModel> getDeepRoleCompositionsStream(RealmModel realm, Stream<String> ids) {
-        LOG.tracef("getDeepCompositeRoleIdsStream(%s, %s)%s", realm, ids, getShortStackTrace());
+    public Stream<RoleCompositionModel> getDeepRoleCompositionsStream(RealmModel realm, Stream<String> ids, Set<String> excludedIds) {
+        LOG.tracef("getDeepCompositeRoleIdsStream(%s, %s, %s)%s", realm, ids, excludedIds, getShortStackTrace());
         if (ids == null) return Stream.empty();
 
         Collection<RoleCompositionModel> collectedRoleCompositions = new LinkedList<>();
         Set<String> roleIdsToCollectChildRoleIdsFrom = ids.collect(Collectors.toSet());
         // Keep track of already visited composite roles ids, so that children collection happens only once
-        Set<String> alreadyVisitedRolesIds = new HashSet<>();
+        Set<String> alreadyVisitedRolesIds = new HashSet<>(Optional.ofNullable(excludedIds).orElse(Collections.emptySet()));
         
         while (!roleIdsToCollectChildRoleIdsFrom.isEmpty()) {
             DefaultModelCriteria<RoleModel> mcb = criteria();

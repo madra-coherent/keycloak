@@ -83,8 +83,22 @@ public interface RoleLookupProvider {
      * @param ids non-null Stream of role compositions. Returns empty {@code Stream} when {@code null}.
      * @return non-null Stream of {@link RoleCompositionModel}.
      */
-    Stream<RoleCompositionModel> getDeepRoleCompositionsStream(RealmModel realm, Stream<String> ids);
-    
+    default Stream<RoleCompositionModel> getDeepRoleCompositionsStream(RealmModel realm, Stream<String> ids) {
+        return getDeepRoleCompositionsStream(realm, ids, Collections.emptySet());
+    }
+
+    /**
+     * Resolves the specified role IDs with the entire set of children role IDs (expanding composites),
+     * retaining the composition relationship between role and its children (if any), and excluding
+     * some IDs from the composition lookup (useful when some parts of the composition graph is already known).
+     *
+     * @param realm Realm. Cannot be {@code null}.
+     * @param ids Stream of role compositions. Returns empty {@code Stream} when {@code null}.
+     * @param excludedIds set of role IDs to exclude from the deep lookup 
+     * @return non-null Stream of {@link RoleCompositionModel}.
+     */
+    Stream<RoleCompositionModel> getDeepRoleCompositionsStream(RealmModel realm, Stream<String> ids, Set<String> excludedIds);
+
     /**
      * Case-insensitive search for roles that contain the given string in their name or description.
      * @param realm Realm.

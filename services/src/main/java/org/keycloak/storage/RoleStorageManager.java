@@ -206,21 +206,21 @@ public class RoleStorageManager implements RoleProvider {
     }
 
     @Override
-    public Stream<RoleCompositionModel> getDeepRoleCompositionsStream(RealmModel realm, Stream<String> ids) {
+    public Stream<RoleCompositionModel> getDeepRoleCompositionsStream(RealmModel realm, Stream<String> ids, Set<String> excludedIds) {
         return ids.collect(Collectors.groupingBy(id -> Optional.ofNullable(new StorageId(id).getProviderId()))) // Map<Optional<String>, List<String>>
                 .entrySet().stream()
-                .map(entry -> getDeepCompositeRoleIdsFromProvider(realm, entry.getValue().stream(), entry.getKey()))
+                .map(entry -> getDeepCompositeRoleIdsFromProvider(realm, entry.getValue().stream(), entry.getKey(), excludedIds))
                 .flatMap(Function.identity());
     }
 
-    private Stream<RoleCompositionModel> getDeepCompositeRoleIdsFromProvider(RealmModel realm, Stream<String> ids, Optional<String> providerId) {
+    private Stream<RoleCompositionModel> getDeepCompositeRoleIdsFromProvider(RealmModel realm, Stream<String> ids, Optional<String> providerId, Set<String> excludedIds) {
         if (!providerId.isPresent()) {
-            return session.roleLocalStorage().getDeepRoleCompositionsStream(realm, ids);
+            return session.roleLocalStorage().getDeepRoleCompositionsStream(realm, ids, excludedIds);
         }
         RoleLookupProvider provider = (RoleLookupProvider)getStorageProvider(session, realm, providerId.get());
         if (provider == null) return Stream.empty();
         if (! isStorageProviderEnabled(realm, providerId.get())) return Stream.empty();
-        return provider.getDeepRoleCompositionsStream(realm, ids);
+        return provider.getDeepRoleCompositionsStream(realm, ids, excludedIds);
     }
     
     @Override
