@@ -147,11 +147,9 @@ public class RoleAdapter implements RoleModel, JpaModel<RoleEntity> {
     }
 
     private void addCompositeRoleWithoutLoadingCompositeCollection(RoleModel role) {
-        RoleEntity thisRoleEntity = toRoleEntity(this);
-        RoleEntity childRoleEntity = toRoleEntity(role);
         // Ensure that the entry does not exist already - will hit the database,
         // but it's required to maintain the semantic of method #addCompositeRole(RoleModel)
-        CompositeRoleEntityKey compositeKey = new CompositeRoleEntityKey(thisRoleEntity.getId(), childRoleEntity.getId());
+        CompositeRoleEntityKey compositeKey = new CompositeRoleEntityKey(this.getId(), role.getId());
         if (em.find(CompositeRoleEntity.class, compositeKey) == null) {
             CompositeRoleEntity composite = new CompositeRoleEntity(compositeKey);
             em.persist(composite);
@@ -160,38 +158,35 @@ public class RoleAdapter implements RoleModel, JpaModel<RoleEntity> {
 
     @Override
     public void removeCompositeRole(RoleModel role) {
+        // Avoid lazy loading the composite role collection if not already done
+        if (Persistence.getPersistenceUtil().isLoaded(getEntity(), "compositeRoles")) {
+            removeCompositeRoleUsingLoadedCompositeCollection(role);
+        }
+        else {
+            removeCompositeRoleWithoutLoadingCompositeCollection(role);
+        }
+    }
+
+    private void removeCompositeRoleUsingLoadedCompositeCollection(RoleModel role) {
         RoleEntity entity = toRoleEntity(role);
         getEntity().getCompositeRoles().remove(entity);
     }
 
+    private void removeCompositeRoleWithoutLoadingCompositeCollection(RoleModel role) {
+        CompositeRoleEntityKey compositeKey = new CompositeRoleEntityKey(this.getId(), role.getId());
+        // Load it first - alternative is to use a named query to perform the removal (but will generate a flush)
+        CompositeRoleEntity compositeEntity = em.find(CompositeRoleEntity.class, compositeKey);
+        if (compositeEntity != null) {
+            em.remove(compositeEntity);
+        }
+    }
+    
     @Override
     public Stream<RoleModel> getCompositesStream() {
         Stream<RoleModel> composites = getEntity().getCompositeRoles().stream().map(c -> new RoleAdapter(session, realm, em, c));
         return composites.filter(Objects::nonNull);
     }
     
-//    @Override
-//    public Stream<RoleModel> getDeepCompositesStream() {
-//        Set<String> collectedRoleIds = new HashSet<>();
-//
-//        Set<String> roleIdsToCollectChildrenRoleIdsFrom = new HashSet<>(Arrays.asList(role.getId()));
-//        while (!roleIdsToCollectChildrenRoleIdsFrom.isEmpty()) {
-//            TypedQuery<String> query = em.createNamedQuery("getChildRoleIdsForCompositeIds", String.class);
-//            query.setParameter("roleIds", roleIdsToCollectChildrenRoleIdsFrom);
-//            
-//            roleIdsToCollectChildrenRoleIdsFrom = new HashSet<>(query.getResultList());
-//            collectedRoleIds.addAll(roleIdsToCollectChildrenRoleIdsFrom);
-//        }
-//        
-//        if (collectedRoleIds.isEmpty()) {
-//            return Stream.empty();
-//        }
-//        
-//        TypedQuery<RoleEntity> query = em.createNamedQuery("getRolesFromIdList", RoleEntity.class);
-//        query.setParameter("ids", collectedRoleIds);
-//        return query.getResultList().stream().map(entity -> new RoleAdapter(session, realm, em, entity));
-//    }
-//
     @Override
     public Stream<RoleModel> getCompositesStream(String search, Integer first, Integer max) {
         return session.roles().getRolesStream(realm,
