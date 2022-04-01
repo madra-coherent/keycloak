@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -81,6 +82,7 @@ import org.keycloak.models.jpa.entities.RoleEntity;
 import org.keycloak.protocol.oidc.OIDCLoginProtocol;
 import org.keycloak.storage.jpa.resources.HibernateContextAbsencePredicate;
 import org.keycloak.storage.jpa.resources.JpaDetachCondition;
+import org.keycloak.utils.StreamsUtil;
 import org.keycloak.models.utils.KeycloakModelUtils;
 
 /**
@@ -507,11 +509,23 @@ public class JpaRealmProvider implements RealmProvider, ClientProvider, ClientSc
         JpaDetachCondition detachCondition = getDetachRolesCondition(ids);
         Map<String, RealmModel> realmsById = realms.stream().collect(Collectors.toMap(RealmModel::getId, Function.identity()));
         
-        TypedQuery<RoleEntity> query = em.createNamedQuery("getRolesFromIdList", RoleEntity.class)
-                .setParameter("realmids", realmsById.keySet())
-                .setParameter("ids", ids);
+        return partition(ids, 512)
+            .map(batchOfIds -> em.createNamedQuery("getRolesFromIdList", RoleEntity.class)
+                    .setParameter("realmids", realmsById.keySet())
+                    .setParameter("ids", batchOfIds))
+            .map(TypedQuery::getResultStream)
+            .map(StreamsUtil::closing)
+            .flatMap(Function.identity())
+            .map(entity -> new RoleAdapter(session, realmsById.get(entity.getRealmId()), em, entity, detachCondition));
+    }
 
-        return closing(query.getResultStream().map(entity -> new RoleAdapter(session, realmsById.get(entity.getRealmId()), em, entity, detachCondition)));
+    private <T> Stream<? extends Collection<T>> partition(Collection<T> items, int partitionSize) {
+        return partition(items.stream(), partitionSize);
+    }
+    
+    private <T> Stream<? extends Collection<T>> partition(Stream<T> items, int partitionSize) {
+        AtomicInteger counter = new AtomicInteger();
+        return items.collect(Collectors.groupingBy(it -> counter.getAndIncrement() / partitionSize)).values().stream();
     }
 
     @Override
