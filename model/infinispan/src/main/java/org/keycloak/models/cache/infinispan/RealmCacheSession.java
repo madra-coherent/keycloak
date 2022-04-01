@@ -472,7 +472,6 @@ public class RealmCacheSession implements CacheRealmProvider {
 
     @Override
     public Stream<String> getRealmIdsStream() {
-        // TODO: implement caching for this query
         return getRealmDelegate().getRealmIdsStream();
     }
 
