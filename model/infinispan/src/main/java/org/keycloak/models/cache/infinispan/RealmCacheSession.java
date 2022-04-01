@@ -513,8 +513,6 @@ public class RealmCacheSession implements CacheRealmProvider {
     @Override
     public Stream<RealmModel> getRealmsStream() {
         return getRealmsByIdsStream(getRealmIdsStream());
-        // Retrieve realms from backend
-        // return getRealms(getRealmDelegate().getRealmsStream());
     }
 
     private Stream<RealmModel> getRealms(Stream<RealmModel> backendRealms) {
