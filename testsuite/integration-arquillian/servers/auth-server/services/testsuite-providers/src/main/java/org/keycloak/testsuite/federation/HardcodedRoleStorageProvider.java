@@ -102,6 +102,14 @@ public class HardcodedRoleStorageProvider implements RoleStorageProvider {
     }
 
     @Override
+    public Stream<RoleCompositionModel> getDeepRoleCompositionsStream(RealmModel realm, Stream<String> ids, Set<String> excludedIds) {
+        return ids.map(StorageId::new)
+                .map(StorageId::getExternalId)
+                .filter(roleName::equals)
+                .map(id -> new RoleCompositionModel(new HardcodedRoleAdapter(realm).getId(), excludedIds));
+    }
+
+    @Override
     public Stream<RoleModel> getRolesByCompositions(Set<RealmModel> realms,
             Stream<RoleCompositionModel> roleCompositions) {
         // TODO Auto-generated method stub
